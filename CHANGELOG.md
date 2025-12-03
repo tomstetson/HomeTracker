@@ -2,6 +2,33 @@
 
 All notable changes to HomeTracker will be documented in this file.
 
+## [1.2.0] - 2024-12-03
+
+### 🚀 New Features
+
+#### Maintenance Page Overhaul
+- **List/Card View Toggle** - Switch between compact list view and detailed card view
+- **Restore Completed Tasks** - Undo task completion, move back to pending
+- **Stats Cards as Filters** - Click Overdue, Upcoming, Pending, or Completed to filter
+- **Edit Task Dialog** - Edit existing tasks directly
+- **Quick Complete** - One-click completion with ability to restore
+
+#### UX Improvements
+- **Unified Search** - Consistent search/filter across Tasks and History views
+- **Priority Filtering** - Filter tasks by priority level
+- **Category Filtering** - Filter by task category
+- **Active Filter Indicators** - Visual highlight on active stat filters
+- **Better Mobile Layout** - Single-column cards on mobile, responsive controls
+
+### 🔧 Improvements
+- Compact task rows with hover actions
+- Clickable stat cards for quick filtering
+- Clear filters button when filters active
+- Improved responsive breakpoints
+- Consistent icon-based actions
+
+---
+
 ## [1.1.0] - 2024-12-03
 
 ### 🚀 New Features

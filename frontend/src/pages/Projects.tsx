@@ -199,7 +199,7 @@ export default function Projects() {
     const column = columns.find(c => c.id === project.status);
     const StatusIcon = column?.icon || Archive;
 
-    return (
+  return (
       <div
         key={project.id}
         className={cn(
@@ -238,8 +238,8 @@ export default function Projects() {
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-              </div>
-            </div>
+        </div>
+      </div>
 
             {/* Meta row */}
             <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -268,7 +268,7 @@ export default function Projects() {
                   <span className="text-xs text-muted-foreground">{project.progress}%</span>
                 </div>
               )}
-            </div>
+      </div>
 
             {/* Tags */}
             {project.tags && project.tags.length > 0 && (
@@ -317,19 +317,19 @@ export default function Projects() {
 
   // Kanban card for desktop
   const renderKanbanCard = (project: Project, columnColor: string) => (
-    <Card
-      key={project.id}
-      draggable
-      onDragStart={() => handleDragStart(project.id)}
-      className={cn(
+                  <Card
+                    key={project.id}
+                    draggable
+                    onDragStart={() => handleDragStart(project.id)}
+                    className={cn(
         "cursor-move hover:shadow-xl transition-all border-border/50",
         "bg-card/80 backdrop-blur-sm hover:bg-card",
         draggedProject === project.id && "opacity-50 scale-95"
-      )}
-    >
-      <CardContent className="p-4">
-        {/* Project Header */}
-        <div className="flex items-start justify-between mb-3">
+                    )}
+                  >
+                    <CardContent className="p-4">
+                      {/* Project Header */}
+                      <div className="flex items-start justify-between mb-3">
           <div className="flex items-start space-x-2 flex-1 min-w-0">
             <GripVertical className="w-4 h-4 text-muted-foreground mt-1 cursor-grab flex-shrink-0" />
             <div className="flex-1 min-w-0">
@@ -337,93 +337,93 @@ export default function Projects() {
               {project.description && (
                 <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
               )}
-            </div>
-          </div>
+                          </div>
+                        </div>
           <div className="flex space-x-1 flex-shrink-0 ml-2">
-            <button
+                          <button
               onClick={(e) => { e.stopPropagation(); openEditDialog(project); }}
               className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
-            >
-              <Edit className="w-4 h-4" />
-            </button>
-            <button
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
               onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id, project.name); }}
               className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
 
         {/* Priority & Category */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
-          <span className={cn(
+                        <span className={cn(
             "px-2 py-1 rounded text-xs font-medium border",
             getPriorityStyles(project.priority)
-          )}>
-            {project.priority.toUpperCase()}
-          </span>
+                        )}>
+                          {project.priority.toUpperCase()}
+                        </span>
           <span className="px-2 py-1 rounded text-xs font-medium bg-muted/50 text-muted-foreground border border-border/50 truncate max-w-[120px]">
-            {project.category}
-          </span>
-        </div>
+                          {project.category}
+                        </span>
+                      </div>
 
-        {/* Progress Bar */}
-        {project.progress > 0 && (
-          <div className="mb-3">
+                      {/* Progress Bar */}
+                      {project.progress > 0 && (
+                        <div className="mb-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-              <span>Progress</span>
+                            <span>Progress</span>
               <span className="font-medium text-foreground">{project.progress}%</span>
-            </div>
+                          </div>
             <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
-              <div
+                            <div
                 className={cn("h-full rounded-full transition-all", `bg-${columnColor}-500`)}
-                style={{ width: `${project.progress}%` }}
-              />
-            </div>
-          </div>
-        )}
+                              style={{ width: `${project.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
 
-        {/* Project Details */}
-        <div className="space-y-2 text-sm">
-          {project.budget && (
+                      {/* Project Details */}
+                      <div className="space-y-2 text-sm">
+                        {project.budget && (
             <div className="flex items-center text-muted-foreground">
               <DollarSign className="w-4 h-4 mr-2 flex-shrink-0" />
               <span className="truncate">
-                {formatCurrency(project.actualCost || 0)} / {formatCurrency(project.budget)}
-              </span>
-            </div>
-          )}
-          {(project.startDate || project.endDate) && (
+                              {formatCurrency(project.actualCost || 0)} / {formatCurrency(project.budget)}
+                            </span>
+                          </div>
+                        )}
+                        {(project.startDate || project.endDate) && (
             <div className="flex items-center text-muted-foreground">
               <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
               <span className="truncate text-xs">
-                {project.startDate && new Date(project.startDate).toLocaleDateString()}
-                {project.endDate && ` - ${new Date(project.endDate).toLocaleDateString()}`}
-              </span>
-            </div>
-          )}
-        </div>
+                              {project.startDate && new Date(project.startDate).toLocaleDateString()}
+                              {project.endDate && ` - ${new Date(project.endDate).toLocaleDateString()}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-        {/* Tags */}
+                      {/* Tags */}
         {project.tags && project.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-3">
+                        <div className="flex flex-wrap gap-1 mt-3">
             {project.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
+                            <span
+                              key={tag}
                 className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-xs text-primary"
-              >
-                <Tag className="w-3 h-3 mr-1" />
-                {tag}
-              </span>
-            ))}
+                            >
+                              <Tag className="w-3 h-3 mr-1" />
+                              {tag}
+                            </span>
+                          ))}
             {project.tags.length > 3 && (
               <span className="text-xs text-muted-foreground">+{project.tags.length - 3}</span>
             )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
   );
 
   return (
@@ -602,18 +602,18 @@ export default function Projects() {
                 <div className="space-y-3">
                   {getProjectsByStatus(column.id).map((project) => renderKanbanCard(project, column.color))}
 
-                  {/* Empty State */}
-                  {getProjectsByStatus(column.id).length === 0 && (
+                {/* Empty State */}
+                {getProjectsByStatus(column.id).length === 0 && (
                     <div className="text-center py-8 text-muted-foreground text-sm border-2 border-dashed border-border/50 rounded-lg">
                       <p>No projects</p>
                       <p className="text-xs mt-1">Drag here or click +</p>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
       )}
 
       {/* Add Project Dialog */}
@@ -663,7 +663,7 @@ export default function Projects() {
                 onChange={setNewProjectTags}
                 suggestions={PROJECT_TAG_SUGGESTIONS}
                 placeholder="Add tags like 'outdoor', 'electrical'..."
-              />
+            />
             </div>
             
             <Textarea 
@@ -740,7 +740,7 @@ export default function Projects() {
                   onChange={setEditProjectTags}
                   suggestions={PROJECT_TAG_SUGGESTIONS}
                   placeholder="Add tags like 'outdoor', 'electrical'..."
-                />
+              />
               </div>
               
               <Textarea 
