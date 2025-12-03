@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useProjectStore, Project } from '../store/projectStore';
+import { useVendorStore } from '../store/vendorStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
@@ -9,18 +10,24 @@ import { useToast } from '../components/ui/Toast';
 import { 
   Plus, GripVertical, Calendar, DollarSign, Tag, Edit, Trash2, 
   ChevronDown, ChevronRight, LayoutGrid, List, Filter,
-  ArrowRight, Check, Clock, Pause, Archive
+  ArrowRight, Check, Clock, Pause, Archive, CheckSquare, Square,
+  ListTodo, X
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 
 type ViewMode = 'kanban' | 'list';
 
 export default function Projects() {
-  const { projects, addProject, updateProject, deleteProject, moveProject } = useProjectStore();
+  const { 
+    projects, addProject, updateProject, deleteProject, moveProject,
+    addSubtask, toggleSubtask, deleteSubtask, getSubtaskProgress 
+  } = useProjectStore();
+  const { vendors } = useVendorStore();
   const toast = useToast();
   const [draggedProject, setDraggedProject] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isSubtaskDialogOpen, setIsSubtaskDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [activeFilter, setActiveFilter] = useState<string>('all');
@@ -29,6 +36,11 @@ export default function Projects() {
   // Tag state for add/edit dialogs
   const [newProjectTags, setNewProjectTags] = useState<string[]>([]);
   const [editProjectTags, setEditProjectTags] = useState<string[]>([]);
+  
+  // Subtask state
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [newSubtaskAssignee, setNewSubtaskAssignee] = useState('');
+  const [newSubtaskCost, setNewSubtaskCost] = useState('');
 
   // Responsive view mode detection
   useEffect(() => {
@@ -143,6 +155,7 @@ export default function Projects() {
       progress: formData.get('progress') ? Number(formData.get('progress')) : 0,
       category: formData.get('category') as string,
       tags: newProjectTags,
+      subtasks: [],
     };
     addProject(newProject);
     setIsAddDialogOpen(false);
@@ -188,9 +201,68 @@ export default function Projects() {
     setIsEditDialogOpen(true);
   };
 
+  const openSubtaskDialog = (project: Project) => {
+    setSelectedProject(project);
+    setIsSubtaskDialogOpen(true);
+    setNewSubtaskTitle('');
+    setNewSubtaskAssignee('');
+    setNewSubtaskCost('');
+  };
+
   const openAddDialog = () => {
     setNewProjectTags([]);
     setIsAddDialogOpen(true);
+  };
+
+  const handleAddSubtask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProject || !newSubtaskTitle.trim()) return;
+    
+    addSubtask(selectedProject.id, {
+      title: newSubtaskTitle.trim(),
+      completed: false,
+      assignedTo: newSubtaskAssignee || undefined,
+      estimatedCost: newSubtaskCost ? Number(newSubtaskCost) : undefined,
+    });
+    
+    setNewSubtaskTitle('');
+    setNewSubtaskAssignee('');
+    setNewSubtaskCost('');
+    toast.success('Subtask Added', `Added "${newSubtaskTitle}"`);
+  };
+
+  const handleToggleSubtask = (projectId: string, subtaskId: string) => {
+    toggleSubtask(projectId, subtaskId);
+  };
+
+  const handleDeleteSubtask = (projectId: string, subtaskId: string, title: string) => {
+    deleteSubtask(projectId, subtaskId);
+    toast.info('Subtask Removed', `Removed "${title}"`);
+  };
+
+  // Subtask indicator component
+  const SubtaskIndicator = ({ project }: { project: Project }) => {
+    const progress = getSubtaskProgress(project);
+    if (progress.total === 0) return null;
+    
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); openSubtaskDialog(project); }}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs transition-colors"
+        title="View subtasks"
+      >
+        <ListTodo className="w-3 h-3" />
+        <span>{progress.completed}/{progress.total}</span>
+        {progress.percentage > 0 && (
+          <div className="w-8 h-1.5 bg-purple-500/20 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-purple-500 rounded-full" 
+              style={{ width: `${progress.percentage}%` }} 
+            />
+          </div>
+        )}
+      </button>
+    );
   };
 
   // Compact project card for list view
@@ -199,7 +271,7 @@ export default function Projects() {
     const column = columns.find(c => c.id === project.status);
     const StatusIcon = column?.icon || Archive;
 
-  return (
+    return (
       <div
         key={project.id}
         className={cn(
@@ -227,6 +299,13 @@ export default function Projects() {
               </div>
               <div className="flex gap-1 flex-shrink-0">
                 <button
+                  onClick={() => openSubtaskDialog(project)}
+                  className="p-1.5 text-muted-foreground hover:text-purple-500 hover:bg-purple-500/10 rounded"
+                  title="Subtasks"
+                >
+                  <ListTodo className="w-4 h-4" />
+                </button>
+                <button
                   onClick={() => openEditDialog(project)}
                   className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded"
                 >
@@ -238,8 +317,8 @@ export default function Projects() {
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-        </div>
-      </div>
+              </div>
+            </div>
 
             {/* Meta row */}
             <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -249,6 +328,8 @@ export default function Projects() {
               )}>
                 {project.priority}
               </span>
+              
+              <SubtaskIndicator project={project} />
               
               {project.budget && (
                 <span className="text-xs text-muted-foreground flex items-center">
@@ -268,7 +349,7 @@ export default function Projects() {
                   <span className="text-xs text-muted-foreground">{project.progress}%</span>
                 </div>
               )}
-      </div>
+            </div>
 
             {/* Tags */}
             {project.tags && project.tags.length > 0 && (
@@ -317,19 +398,19 @@ export default function Projects() {
 
   // Kanban card for desktop
   const renderKanbanCard = (project: Project, columnColor: string) => (
-                  <Card
-                    key={project.id}
-                    draggable
-                    onDragStart={() => handleDragStart(project.id)}
-                    className={cn(
+    <Card
+      key={project.id}
+      draggable
+      onDragStart={() => handleDragStart(project.id)}
+      className={cn(
         "cursor-move hover:shadow-xl transition-all border-border/50",
         "bg-card/80 backdrop-blur-sm hover:bg-card",
         draggedProject === project.id && "opacity-50 scale-95"
-                    )}
-                  >
-                    <CardContent className="p-4">
-                      {/* Project Header */}
-                      <div className="flex items-start justify-between mb-3">
+      )}
+    >
+      <CardContent className="p-4">
+        {/* Project Header */}
+        <div className="flex items-start justify-between mb-3">
           <div className="flex items-start space-x-2 flex-1 min-w-0">
             <GripVertical className="w-4 h-4 text-muted-foreground mt-1 cursor-grab flex-shrink-0" />
             <div className="flex-1 min-w-0">
@@ -337,93 +418,101 @@ export default function Projects() {
               {project.description && (
                 <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
               )}
-                          </div>
-                        </div>
+            </div>
+          </div>
           <div className="flex space-x-1 flex-shrink-0 ml-2">
-                          <button
+            <button
+              onClick={(e) => { e.stopPropagation(); openSubtaskDialog(project); }}
+              className="p-1.5 text-muted-foreground hover:text-purple-500 hover:bg-purple-500/10 rounded transition-colors"
+              title="Subtasks"
+            >
+              <ListTodo className="w-4 h-4" />
+            </button>
+            <button
               onClick={(e) => { e.stopPropagation(); openEditDialog(project); }}
               className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button
               onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id, project.name); }}
               className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
-        {/* Priority & Category */}
+        {/* Priority, Category & Subtasks */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <span className={cn(
+          <span className={cn(
             "px-2 py-1 rounded text-xs font-medium border",
             getPriorityStyles(project.priority)
-                        )}>
-                          {project.priority.toUpperCase()}
-                        </span>
+          )}>
+            {project.priority.toUpperCase()}
+          </span>
           <span className="px-2 py-1 rounded text-xs font-medium bg-muted/50 text-muted-foreground border border-border/50 truncate max-w-[120px]">
-                          {project.category}
-                        </span>
-                      </div>
+            {project.category}
+          </span>
+          <SubtaskIndicator project={project} />
+        </div>
 
-                      {/* Progress Bar */}
-                      {project.progress > 0 && (
-                        <div className="mb-3">
+        {/* Progress Bar */}
+        {project.progress > 0 && (
+          <div className="mb-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                            <span>Progress</span>
+              <span>Progress</span>
               <span className="font-medium text-foreground">{project.progress}%</span>
-                          </div>
+            </div>
             <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
-                            <div
+              <div
                 className={cn("h-full rounded-full transition-all", `bg-${columnColor}-500`)}
-                              style={{ width: `${project.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+                style={{ width: `${project.progress}%` }}
+              />
+            </div>
+          </div>
+        )}
 
-                      {/* Project Details */}
-                      <div className="space-y-2 text-sm">
-                        {project.budget && (
+        {/* Project Details */}
+        <div className="space-y-2 text-sm">
+          {project.budget && (
             <div className="flex items-center text-muted-foreground">
               <DollarSign className="w-4 h-4 mr-2 flex-shrink-0" />
               <span className="truncate">
-                              {formatCurrency(project.actualCost || 0)} / {formatCurrency(project.budget)}
-                            </span>
-                          </div>
-                        )}
-                        {(project.startDate || project.endDate) && (
+                {formatCurrency(project.actualCost || 0)} / {formatCurrency(project.budget)}
+              </span>
+            </div>
+          )}
+          {(project.startDate || project.endDate) && (
             <div className="flex items-center text-muted-foreground">
               <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
               <span className="truncate text-xs">
-                              {project.startDate && new Date(project.startDate).toLocaleDateString()}
-                              {project.endDate && ` - ${new Date(project.endDate).toLocaleDateString()}`}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                {project.startDate && new Date(project.startDate).toLocaleDateString()}
+                {project.endDate && ` - ${new Date(project.endDate).toLocaleDateString()}`}
+              </span>
+            </div>
+          )}
+        </div>
 
-                      {/* Tags */}
+        {/* Tags */}
         {project.tags && project.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-3">
+          <div className="flex flex-wrap gap-1 mt-3">
             {project.tags.slice(0, 3).map((tag) => (
-                            <span
-                              key={tag}
+              <span
+                key={tag}
                 className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-xs text-primary"
-                            >
-                              <Tag className="w-3 h-3 mr-1" />
-                              {tag}
-                            </span>
-                          ))}
+              >
+                <Tag className="w-3 h-3 mr-1" />
+                {tag}
+              </span>
+            ))}
             {project.tags.length > 3 && (
               <span className="text-xs text-muted-foreground">+{project.tags.length - 3}</span>
             )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 
   return (
@@ -497,102 +586,73 @@ export default function Projects() {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Filter className="w-4 h-4" />
           <span>Showing {columns.find(c => c.id === activeFilter)?.title} projects</span>
-          <button 
-            onClick={() => setActiveFilter('all')}
-            className="text-primary hover:underline"
-          >
-            Clear filter
-          </button>
+          <button onClick={() => setActiveFilter('all')} className="text-primary hover:underline">Clear</button>
         </div>
       )}
 
-      {/* List View */}
+      {/* List View - Mobile/Tablet or when selected */}
       {viewMode === 'list' && (
         <div className="space-y-3">
-          {activeFilter === 'all' ? (
-            // Grouped by status with collapsible sections
-            columns.map((column) => {
-              const columnProjects = getProjectsByStatus(column.id);
-              const isExpanded = expandedSections.has(column.id);
-              const Icon = column.icon;
-
-              return (
-                <div key={column.id} className="bg-card/30 rounded-xl border border-border/50 overflow-hidden">
-                  <button
-                    onClick={() => toggleSection(column.id)}
-                    className="w-full flex items-center justify-between p-3 hover:bg-muted/20 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", `bg-${column.color}-500/20`)}>
-                        <Icon className={cn("w-4 h-4", `text-${column.color}-500`)} />
-                      </div>
-                      <span className="font-semibold text-foreground">{column.title}</span>
-                      <span className="px-2 py-0.5 rounded-full bg-muted/50 text-xs text-muted-foreground">
-                        {columnProjects.length}
-                      </span>
-                    </div>
-                    {isExpanded ? (
-                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                    )}
-                  </button>
-                  
-                  {isExpanded && (
-                    <div className="p-3 pt-0 space-y-2">
-                      {columnProjects.length === 0 ? (
-                        <p className="text-center py-4 text-muted-foreground text-sm">No projects</p>
-                      ) : (
-                        columnProjects.map((project) => renderListCard(project))
-                      )}
-                    </div>
+          {columns.map((column) => {
+            const columnProjects = getFilteredProjects().filter(p => p.status === column.id);
+            if (columnProjects.length === 0 && activeFilter !== 'all') return null;
+            
+            return (
+              <div key={column.id}>
+                <button
+                  onClick={() => toggleSection(column.id)}
+                  className="flex items-center gap-2 mb-2 text-sm font-medium text-foreground"
+                >
+                  {expandedSections.has(column.id) ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
                   )}
-                </div>
-              );
-            })
-          ) : (
-            // Filtered view - flat list
-            <div className="space-y-2">
-              {getFilteredProjects().length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <p>No projects in this category</p>
-                </div>
-              ) : (
-                getFilteredProjects().map((project) => renderListCard(project))
-              )}
-            </div>
-          )}
+                  <column.icon className={cn("w-4 h-4", `text-${column.color}-500`)} />
+                  <span>{column.title}</span>
+                  <span className="text-muted-foreground">({columnProjects.length})</span>
+                </button>
+                
+                {expandedSections.has(column.id) && (
+                  <div className="space-y-2 ml-6">
+                    {columnProjects.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">No projects</p>
+                    ) : (
+                      columnProjects.map(project => renderListCard(project))
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* Kanban View - Desktop */}
       {viewMode === 'kanban' && (
-        <div className="hidden md:flex gap-4 overflow-x-auto pb-4">
-          {(activeFilter === 'all' ? columns : columns.filter(c => c.id === activeFilter)).map((column) => (
+        <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 lg:mx-0 lg:px-0">
+          {columns.map((column) => (
             <div
               key={column.id}
-              className="flex-shrink-0 w-80"
+              className="flex-shrink-0 w-72 lg:w-80"
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(column.id as Project['status'])}
             >
-              <div className={cn(
-                "rounded-xl p-4 backdrop-blur-md border border-border/50 h-full min-h-[400px]",
-                "bg-gradient-to-b", column.gradient
-              )}>
+              <div className="bg-muted/30 backdrop-blur-sm rounded-lg border border-border/50 p-3">
                 {/* Column Header */}
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-foreground flex items-center">
-                    <span className={cn("w-3 h-3 rounded-full mr-2", getColumnAccentColor(column.color))} />
-                    {column.title}
-                    <span className="ml-2 px-2 py-0.5 bg-background/50 rounded-full text-xs text-muted-foreground">
+                  <div className="flex items-center space-x-2">
+                    <div className={cn("w-3 h-3 rounded-full", getColumnAccentColor(column.color))} />
+                    <h3 className="font-semibold text-foreground">{column.title}</h3>
+                    <span className="text-sm text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
                       {getProjectsByStatus(column.id).length}
                     </span>
-                  </h3>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 hover:bg-background/50"
-                    onClick={openAddDialog}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground p-1.5"
+                    onClick={() => { setNewProjectTags([]); setIsAddDialogOpen(true); }}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -602,18 +662,18 @@ export default function Projects() {
                 <div className="space-y-3">
                   {getProjectsByStatus(column.id).map((project) => renderKanbanCard(project, column.color))}
 
-                {/* Empty State */}
-                {getProjectsByStatus(column.id).length === 0 && (
+                  {/* Empty State */}
+                  {getProjectsByStatus(column.id).length === 0 && (
                     <div className="text-center py-8 text-muted-foreground text-sm border-2 border-dashed border-border/50 rounded-lg">
                       <p>No projects</p>
                       <p className="text-xs mt-1">Drag here or click +</p>
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
       )}
 
       {/* Add Project Dialog */}
@@ -663,7 +723,7 @@ export default function Projects() {
                 onChange={setNewProjectTags}
                 suggestions={PROJECT_TAG_SUGGESTIONS}
                 placeholder="Add tags like 'outdoor', 'electrical'..."
-            />
+              />
             </div>
             
             <Textarea 
@@ -740,7 +800,7 @@ export default function Projects() {
                   onChange={setEditProjectTags}
                   suggestions={PROJECT_TAG_SUGGESTIONS}
                   placeholder="Add tags like 'outdoor', 'electrical'..."
-              />
+                />
               </div>
               
               <Textarea 
@@ -759,6 +819,129 @@ export default function Projects() {
               <Button type="submit">Save Changes</Button>
             </DialogFooter>
           </form>
+        )}
+      </Dialog>
+
+      {/* Subtasks Dialog */}
+      <Dialog
+        open={isSubtaskDialogOpen}
+        onClose={() => { setIsSubtaskDialogOpen(false); setSelectedProject(null); }}
+        title={selectedProject ? `Subtasks: ${selectedProject.name}` : 'Subtasks'}
+        description="Break down your project into manageable steps"
+        maxWidth="lg"
+      >
+        {selectedProject && (
+          <div className="space-y-4">
+            {/* Add new subtask */}
+            <form onSubmit={handleAddSubtask} className="flex gap-2 items-end">
+              <div className="flex-1">
+                <Input
+                  label="New Subtask"
+                  placeholder="e.g., Install cabinets"
+                  value={newSubtaskTitle}
+                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                />
+              </div>
+              <Select
+                value={newSubtaskAssignee}
+                onChange={(e) => setNewSubtaskAssignee(e.target.value)}
+                options={[
+                  { value: '', label: 'Assign to...' },
+                  { value: 'DIY', label: 'DIY / Homeowner' },
+                  ...vendors.map(v => ({ value: v.businessName, label: v.businessName })),
+                ]}
+                className="w-40"
+              />
+              <Input
+                type="number"
+                placeholder="Est. cost"
+                value={newSubtaskCost}
+                onChange={(e) => setNewSubtaskCost(e.target.value)}
+                className="w-28"
+              />
+              <Button type="submit" disabled={!newSubtaskTitle.trim()}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </form>
+
+            {/* Progress summary */}
+            {selectedProject.subtasks && selectedProject.subtasks.length > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-lg">
+                <div className="flex-1">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-medium text-foreground">
+                      {getSubtaskProgress(selectedProject).completed} / {getSubtaskProgress(selectedProject).total} complete
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-purple-500 rounded-full transition-all" 
+                      style={{ width: `${getSubtaskProgress(selectedProject).percentage}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Subtask list */}
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {(!selectedProject.subtasks || selectedProject.subtasks.length === 0) ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <ListTodo className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p>No subtasks yet</p>
+                  <p className="text-sm">Add subtasks to break down this project</p>
+                </div>
+              ) : (
+                selectedProject.subtasks.sort((a, b) => a.order - b.order).map((subtask) => (
+                  <div 
+                    key={subtask.id}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-lg border transition-all",
+                      subtask.completed 
+                        ? "bg-emerald-500/5 border-emerald-500/20" 
+                        : "bg-card/50 border-border/50 hover:bg-card/80"
+                    )}
+                  >
+                    <button
+                      onClick={() => handleToggleSubtask(selectedProject.id, subtask.id)}
+                      className="flex-shrink-0"
+                    >
+                      {subtask.completed ? (
+                        <CheckSquare className="w-5 h-5 text-emerald-500" />
+                      ) : (
+                        <Square className="w-5 h-5 text-muted-foreground hover:text-primary" />
+                      )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn(
+                        "font-medium",
+                        subtask.completed ? "line-through text-muted-foreground" : "text-foreground"
+                      )}>
+                        {subtask.title}
+                      </p>
+                      <div className="flex gap-2 text-xs text-muted-foreground">
+                        {subtask.assignedTo && <span>{subtask.assignedTo}</span>}
+                        {subtask.estimatedCost && <span>• {formatCurrency(subtask.estimatedCost)}</span>}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteSubtask(selectedProject.id, subtask.id, subtask.title)}
+                      className="p-1 text-muted-foreground hover:text-destructive rounded"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsSubtaskDialogOpen(false); setSelectedProject(null); }}>
+                Done
+              </Button>
+            </DialogFooter>
+          </div>
         )}
       </Dialog>
     </div>

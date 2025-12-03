@@ -14,58 +14,94 @@
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#screenshots">Screenshots</a> •
-  <a href="#deployment">Deployment</a> •
-  <a href="#documentation">Documentation</a>
+  <a href="#-features">Features</a> •
+  <a href="#-screenshots">Screenshots</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-deployment">Deployment</a> •
+  <a href="#-documentation">Documentation</a>
 </p>
 
 ---
 
-## Screenshots
+## 🏠 Why HomeTracker?
 
-<p align="center">
-  <img src="docs/screenshots/dashboard.png" alt="Dashboard" width="100%">
-  <em>Dashboard - Overview of your home at a glance</em>
-</p>
+Managing a home involves tracking **a lot** of information: warranty expiration dates, maintenance schedules, project budgets, vendor contacts, paint colors, and more. HomeTracker brings it all together in one place.
 
-<p align="center">
-  <img src="docs/screenshots/projects.png" alt="Projects Kanban" width="100%">
-  <em>Project Tracker - Kanban board for home improvement projects</em>
-</p>
+**Built for homelabbers**, HomeTracker is:
+- **Self-hosted** - Your data stays on your server
+- **Privacy-focused** - No cloud accounts, no data sharing
+- **Resource-efficient** - Runs great on a Raspberry Pi
+- **Docker-ready** - Single container deployment
 
-<p align="center">
-  <img src="docs/screenshots/projects-dark.png" alt="Dark Mode" width="100%">
-  <em>Full Dark Mode Support</em>
-</p>
+---
 
-## Features
+## 📸 Screenshots
+
+<table>
+<tr>
+<td width="50%">
+
+### Dashboard
+![Dashboard](docs/screenshots/dashboard.png)
+*At-a-glance overview of your home with quick actions*
+
+</td>
+<td width="50%">
+
+### Project Tracker
+![Projects](docs/screenshots/projects-kanban.png)
+*Kanban board with drag-and-drop, budgets, and progress tracking*
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### Maintenance
+![Maintenance](docs/screenshots/maintenance.png)
+*Schedule tasks, track service history, manage recurring maintenance*
+
+</td>
+<td width="50%">
+
+### Inventory
+![Inventory](docs/screenshots/inventory.png)
+*Track appliances with warranties, values, and sale tracking*
+
+</td>
+</tr>
+</table>
+
+---
+
+## ✨ Features
 
 ### 📋 Core Modules
-- **Project Tracker** - Kanban board with drag-and-drop, budgets, progress tracking, and tags
-- **Inventory** - Track appliances, furniture, electronics with warranties attached per item
-  - 🆕 **Sell Tracking** - Log sales, track profit/loss vs purchase price
-  - 🆕 **Soft Delete** - 180-day trash retention before permanent deletion
-  - 🆕 **Custom Categories** - Add/remove categories and selling platforms
-- **Maintenance** - Schedule tasks with priorities and due dates
-  - 🆕 **Service History** - View all completed maintenance with cost tracking
-- **Vendors** - Directory of contractors with customizable categories
-- **Home Info** - Property details, value tracking, paint colors, emergency contacts
-- **Documents** - Store manuals, receipts, and important documents with **OCR search**
-- **Settings** - App configuration, data management, backup options
 
-### ✨ Technical Features
-- 🌙 **Dark/Light Mode** - Beautiful UI with full theme support
-- 📱 **Responsive Design** - Works great on desktop, tablet, and mobile
-- 🔄 **Auto-Sync** - Automatic data synchronization between browser and server
-- 💾 **Excel Export** - All data synced to `.xlsx` in real-time
-- 📄 **File Storage** - Upload receipts, manuals, photos with persistent storage
-- 🔍 **OCR Search** - Automatically extract text from images for searchability
-- 🐳 **Docker Ready** - Single container deployment
-- 🔒 **Self-Hosted** - Your data stays on your server
+| Module | Description |
+|--------|-------------|
+| **Dashboard** | At-a-glance overview with quick actions |
+| **Projects** | Kanban board with subtasks, budgets, progress tracking, and tags |
+| **Inventory** | Track items with warranties, sell tracking, and soft delete |
+| **Maintenance** | Schedule tasks with priorities, recurrence, and service history |
+| **Vendors** | Directory of contractors with custom categories |
+| **Documents** | Store files with OCR search capability |
+| **Home Info** | Property details, value tracking, paint colors, emergency contacts |
+| **Settings** | App configuration, data management, backup options |
 
-## Quick Start
+### 🚀 Key Capabilities
+
+- **🌙 Dark/Light Mode** - Beautiful UI with full theme support
+- **📱 Responsive** - Works on desktop, tablet, and mobile
+- **🔍 Global Search** - Find anything with `Ctrl+K`
+- **📊 Excel Export** - All data synced to `.xlsx` in real-time
+- **📄 File Storage** - Upload receipts, manuals, photos
+- **🔍 OCR Search** - Extract text from images automatically
+- **🐳 Docker Ready** - Single container deployment
+
+---
+
+## 🚀 Quick Start
 
 ### Docker (Recommended)
 
@@ -96,16 +132,18 @@ cd frontend && npm install && npm run dev
 # Access at http://localhost:3000
 ```
 
-## Deployment
+---
 
-HomeTracker is designed for homelab deployment:
+## 🐳 Deployment
+
+HomeTracker is designed for homelab deployment. All data persists in the `./data` directory.
 
 ```yaml
 # docker-compose.yml
 version: '3.8'
 services:
   hometracker:
-    image: hometracker:latest
+    build: .
     ports:
       - "8080:80"
     volumes:
@@ -114,11 +152,14 @@ services:
     restart: unless-stopped
 ```
 
-### Data Persistence
+### Data Files
 
-All data is stored in the `./data` directory:
-- `hometracker.json` - Primary data file
-- `hometracker.xlsx` - Excel export (auto-generated)
+| File | Description |
+|------|-------------|
+| `hometracker.json` | Primary data file (auto-saved) |
+| `hometracker.xlsx` | Excel export (auto-generated) |
+| `uploads/` | Uploaded documents and images |
+| `backups/` | Automated backups |
 
 ### Backup
 
@@ -130,7 +171,9 @@ All data is stored in the `./data` directory:
 0 2 * * * /path/to/hometracker/docker/backup.sh
 ```
 
-## Documentation
+---
+
+## 📚 Documentation
 
 | Document | Description |
 |----------|-------------|
@@ -139,19 +182,22 @@ All data is stored in the `./data` directory:
 | [Storage Options](docs/STORAGE_OPTIONS.md) | Local, NAS, and cloud storage |
 | [Backup Strategy](docs/BACKUP_STRATEGY.md) | 3-2-1 backup best practices |
 | [Homelab Architecture](docs/HOMELAB_ARCHITECTURE.md) | Docker vs VM guide |
-| [Roadmap](docs/V1_ROADMAP.md) | Feature roadmap |
 | [File Storage](docs/FILE_STORAGE.md) | Document storage & OCR |
 
-## Tech Stack
+---
+
+## 🛠 Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 18, Vite, Tailwind CSS, Zustand |
-| Backend | Node.js, Express.js, ExcelJS |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Zustand |
+| Backend | Node.js, Express.js, ExcelJS, Tesseract.js (OCR) |
 | Storage | JSON files + Excel export |
 | Deployment | Docker, Nginx, Supervisor |
 
-## Contributing
+---
+
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -161,14 +207,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
+---
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Built for the homelab community
-- Inspired by the need for a simple, self-hosted home management solution
 
 ---
 

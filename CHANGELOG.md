@@ -2,6 +2,24 @@
 
 All notable changes to HomeTracker will be documented in this file.
 
+## [1.2.1] - 2024-12-03
+
+### 🚀 New Features
+
+#### Project Subtasks
+- **Subtask Management** - Break large projects into manageable steps
+- **Subtask Progress Indicator** - Visual progress on project cards
+- **Quick Toggle** - Check/uncheck subtasks with one click
+- **Assignee Support** - Assign subtasks to DIY or vendors
+- **Cost Tracking** - Estimate costs per subtask
+
+### 📚 Documentation
+- **Improved README** - Better screenshots, cleaner layout
+- **Fixed Screenshots** - All module screenshots now loading correctly
+- **Updated Descriptions** - Clearer feature explanations
+
+---
+
 ## [1.2.0] - 2024-12-03
 
 ### 🚀 New Features
