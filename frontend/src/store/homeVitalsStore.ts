@@ -4,22 +4,18 @@ import { persist } from 'zustand/middleware';
 export interface PaintColor {
   id: string;
   room: string;
-  brand: string;
   colorName: string;
-  colorCode: string;
+  brand?: string;
+  colorCode?: string;
   hexColor?: string;
-  finish: 'flat' | 'eggshell' | 'satin' | 'semi-gloss' | 'gloss' | 'other';
-  surface: 'walls' | 'ceiling' | 'trim' | 'doors' | 'cabinets' | 'exterior' | 'other';
-  dateApplied?: string;
-  purchaseLocation?: string;
-  notes?: string;
+  finish?: string;
 }
 
 export interface EmergencyContact {
   id: string;
   name: string;
   phone: string;
-  type: 'plumber' | 'electrician' | 'hvac' | 'handyman' | 'locksmith' | 'other';
+  type: 'Plumber' | 'Electrician' | 'HVAC' | 'Handyman' | 'Locksmith' | 'Family' | 'Neighbor' | 'Insurance' | 'Other' | string;
   notes?: string;
 }
 
@@ -27,6 +23,13 @@ export interface ShutoffLocation {
   location: string;
   notes?: string;
   photoUrl?: string;
+}
+
+export interface HomeValue {
+  date: string;
+  value: number;
+  source: string;
+  notes?: string;
 }
 
 export interface HomeVitals {
@@ -62,18 +65,17 @@ export interface ServiceRecord {
   id: string;
   date: string;
   type: string;
-  itemId?: string;
-  vendorId?: string;
-  vendorName?: string;
-  cost?: number;
   description: string;
+  vendorId?: string;
+  cost?: number;
   notes?: string;
-  receiptUrl?: string;
+  relatedItemId?: string;
 }
 
 interface HomeVitalsState {
   paintColors: PaintColor[];
   homeVitals: HomeVitals;
+  homeValues: HomeValue[];
   serviceHistory: ServiceRecord[];
   
   // Paint Colors
@@ -86,6 +88,11 @@ interface HomeVitalsState {
   addEmergencyContact: (contact: EmergencyContact) => void;
   updateEmergencyContact: (id: string, updates: Partial<EmergencyContact>) => void;
   deleteEmergencyContact: (id: string) => void;
+  
+  // Home Values
+  addHomeValue: (value: HomeValue) => void;
+  updateHomeValue: (date: string, updates: Partial<HomeValue>) => void;
+  deleteHomeValue: (date: string) => void;
   
   // Service History
   addServiceRecord: (record: ServiceRecord) => void;
@@ -107,21 +114,20 @@ export const useHomeVitalsStore = create<HomeVitalsState>()(
     (set) => ({
       paintColors: [],
       homeVitals: defaultHomeVitals,
+      homeValues: [],
       serviceHistory: [],
 
       // Paint Colors
       addPaintColor: (color) =>
-        set((state) => ({
-          paintColors: [...state.paintColors, color],
-        })),
-      
+        set((state) => ({ paintColors: [...state.paintColors, color] })),
+
       updatePaintColor: (id, updates) =>
         set((state) => ({
           paintColors: state.paintColors.map((c) =>
             c.id === id ? { ...c, ...updates } : c
           ),
         })),
-      
+
       deletePaintColor: (id) =>
         set((state) => ({
           paintColors: state.paintColors.filter((c) => c.id !== id),
@@ -132,7 +138,7 @@ export const useHomeVitalsStore = create<HomeVitalsState>()(
         set((state) => ({
           homeVitals: { ...state.homeVitals, ...updates },
         })),
-      
+
       addEmergencyContact: (contact) =>
         set((state) => ({
           homeVitals: {
@@ -140,7 +146,7 @@ export const useHomeVitalsStore = create<HomeVitalsState>()(
             emergencyContacts: [...state.homeVitals.emergencyContacts, contact],
           },
         })),
-      
+
       updateEmergencyContact: (id, updates) =>
         set((state) => ({
           homeVitals: {
@@ -150,7 +156,7 @@ export const useHomeVitalsStore = create<HomeVitalsState>()(
             ),
           },
         })),
-      
+
       deleteEmergencyContact: (id) =>
         set((state) => ({
           homeVitals: {
@@ -161,28 +167,40 @@ export const useHomeVitalsStore = create<HomeVitalsState>()(
           },
         })),
 
+      // Home Values
+      addHomeValue: (value) =>
+        set((state) => ({ homeValues: [...state.homeValues, value] })),
+
+      updateHomeValue: (date, updates) =>
+        set((state) => ({
+          homeValues: state.homeValues.map((v) =>
+            v.date === date ? { ...v, ...updates } : v
+          ),
+        })),
+
+      deleteHomeValue: (date) =>
+        set((state) => ({
+          homeValues: state.homeValues.filter((v) => v.date !== date),
+        })),
+
       // Service History
       addServiceRecord: (record) =>
-        set((state) => ({
-          serviceHistory: [record, ...state.serviceHistory],
-        })),
-      
+        set((state) => ({ serviceHistory: [...state.serviceHistory, record] })),
+
       updateServiceRecord: (id, updates) =>
         set((state) => ({
           serviceHistory: state.serviceHistory.map((r) =>
             r.id === id ? { ...r, ...updates } : r
           ),
         })),
-      
+
       deleteServiceRecord: (id) =>
         set((state) => ({
           serviceHistory: state.serviceHistory.filter((r) => r.id !== id),
         })),
     }),
     {
-      name: 'hometracker_homeVitals',
+      name: 'hometracker_home_vitals',
     }
   )
 );
-
-

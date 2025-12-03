@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { useOptionsStore } from '../store/optionsStore';
 import {
   Plus,
   Search,
@@ -17,38 +18,29 @@ import {
   Star,
   Briefcase,
   Heart,
+  Settings,
+  X,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-
-const VENDOR_CATEGORIES = [
-  'General Contractor',
-  'Plumbing',
-  'Electrical',
-  'HVAC',
-  'Roofing',
-  'Landscaping',
-  'Painting',
-  'Carpentry',
-  'Flooring',
-  'Drywall',
-  'Appliance Repair',
-  'Cleaning',
-  'Pest Control',
-  'Emergency',
-  'Licensed',
-  'Insured',
-];
 
 export default function Vendors() {
   const { vendors, isLoading, addVendor, updateVendor, deleteVendor, searchVendors, getPreferredVendors, loadFromStorage } =
     useVendorStore();
+  const { getOptions, addOption, removeOption, isDefault } = useOptionsStore();
   const toast = useToast();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPreferred, setFilterPreferred] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [newCategory, setNewCategory] = useState('');
+
+  // Get vendor categories from centralized options
+  const vendorCategories = getOptions('vendorCategories');
 
   useEffect(() => {
     loadFromStorage();
@@ -105,11 +97,12 @@ export default function Vendors() {
     toast.success('Vendor Updated', 'Successfully updated vendor details');
   };
 
-  const handleDeleteVendor = (id: string, businessName: string) => {
-    if (confirm(`Are you sure you want to delete ${businessName}?`)) {
-      deleteVendor(id);
-      toast.success('Vendor Deleted', `Removed ${businessName} from vendors`);
-    }
+  const handleDeleteVendor = () => {
+    if (!selectedVendor) return;
+    deleteVendor(selectedVendor.id);
+    setIsDeleteDialogOpen(false);
+    toast.success('Vendor Deleted', `Removed ${selectedVendor.businessName} from vendors`);
+    setSelectedVendor(null);
   };
 
   const togglePreferred = (id: string, currentStatus: boolean) => {
@@ -122,10 +115,23 @@ export default function Vendors() {
     setIsEditDialogOpen(true);
   };
 
+  const openDeleteDialog = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setIsDeleteDialogOpen(true);
+  };
+
   const toggleCategory = (category: string) => {
     setSelectedCategories((prev) =>
       prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
     );
+  };
+
+  const handleAddCategory = () => {
+    if (newCategory.trim()) {
+      addOption('vendorCategories', newCategory.trim());
+      setNewCategory('');
+      toast.success('Category Added', `"${newCategory.trim()}" is now available`);
+    }
   };
 
   const renderStars = (rating: number) => {
@@ -157,15 +163,21 @@ export default function Vendors() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Vendor Directory</h1>
           <p className="text-muted-foreground">Manage your trusted contractors and service providers</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="flex items-center space-x-2">
-          <Plus className="w-4 h-4" />
-          <span>Add Vendor</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsCategoryDialogOpen(true)}>
+            <Settings className="w-4 h-4 mr-2" />
+            Categories
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)} className="flex items-center space-x-2">
+            <Plus className="w-4 h-4" />
+            <span>Add Vendor</span>
+          </Button>
+        </div>
       </div>
 
       {/* Search & Filters */}
@@ -273,7 +285,7 @@ export default function Vendors() {
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDeleteVendor(vendor.id, vendor.businessName)}
+                      onClick={() => openDeleteDialog(vendor)}
                       className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -388,7 +400,7 @@ export default function Vendors() {
                 Categories <span className="text-destructive">*</span>
               </label>
               <div className="flex flex-wrap gap-2 p-3 border border-input rounded-md bg-background">
-                {VENDOR_CATEGORIES.map((category) => (
+                {vendorCategories.map((category) => (
                   <button
                     key={category}
                     type="button"
@@ -457,7 +469,7 @@ export default function Vendors() {
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Categories</label>
                 <div className="flex flex-wrap gap-2 p-3 border border-input rounded-md bg-background">
-                  {VENDOR_CATEGORIES.map((category) => (
+                  {vendorCategories.map((category) => (
                     <button
                       key={category}
                       type="button"
@@ -493,6 +505,98 @@ export default function Vendors() {
             </DialogFooter>
           </form>
         )}
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onClose={() => {
+          setIsDeleteDialogOpen(false);
+          setSelectedVendor(null);
+        }}
+        title="Delete Vendor?"
+      >
+        {selectedVendor && (
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Are you sure you want to delete <strong className="text-foreground">{selectedVendor.businessName}</strong>?
+            </p>
+            <p className="text-sm text-muted-foreground">
+              This action cannot be undone. All vendor information will be permanently removed.
+            </p>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsDeleteDialogOpen(false);
+                  setSelectedVendor(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="button" variant="destructive" onClick={handleDeleteVendor}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Vendor
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Categories Management Dialog */}
+      <Dialog
+        open={isCategoryDialogOpen}
+        onClose={() => setIsCategoryDialogOpen(false)}
+        title="Manage Vendor Categories"
+      >
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="New category name..."
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddCategory();
+                }
+              }}
+            />
+            <Button onClick={handleAddCategory} disabled={!newCategory.trim()}>
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <div className="max-h-64 overflow-y-auto space-y-1">
+            {vendorCategories.map((category) => (
+              <div key={category} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/20">
+                <span className="text-foreground">{category}</span>
+                {!isDefault('vendorCategories', category) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={() => {
+                      removeOption('vendorCategories', category);
+                      toast.info('Category Removed', `"${category}" has been removed`);
+                    }}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Default categories cannot be removed. Custom categories sync with your data backup.
+          </p>
+
+          <DialogFooter>
+            <Button onClick={() => setIsCategoryDialogOpen(false)}>Done</Button>
+          </DialogFooter>
+        </div>
       </Dialog>
     </div>
   );

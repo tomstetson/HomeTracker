@@ -14,6 +14,8 @@ export interface StorageData {
   warranties: any[];
   documents: any[];
   categories: any[];
+  customOptions: any;
+  homeVitals: any;
 }
 
 // Initialize storage with default data
@@ -30,6 +32,8 @@ export const initStorage = () => {
       warranties: [],
       documents: [],
       categories: [],
+      customOptions: {},
+      homeVitals: {},
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
   }

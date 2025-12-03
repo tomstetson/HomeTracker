@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { useInventoryStore, InventoryItem, SaleRecord, DEFAULT_CATEGORIES } from '../store/inventoryStore';
+import { useInventoryStore, InventoryItem, SaleRecord } from '../store/inventoryStore';
+import { useOptionsStore } from '../store/optionsStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
@@ -32,7 +33,6 @@ type SortBy = 'name' | 'value' | 'date' | 'category';
 export default function Items() {
   const { 
     items, 
-    categories,
     addItem, 
     updateItem, 
     softDeleteItem,
@@ -40,8 +40,6 @@ export default function Items() {
     permanentlyDeleteItem,
     emptyTrash,
     sellItem,
-    addCategory,
-    removeCategory,
     getActiveItems,
     getSoldItems,
     getDeletedItems,
@@ -254,7 +252,7 @@ export default function Items() {
 
   const handleAddCategory = () => {
     if (newCategory.trim()) {
-      addCategory(newCategory.trim());
+      addOption('inventoryCategories', newCategory.trim());
       setNewCategory('');
       toast.success('Category Added', `"${newCategory.trim()}" is now available`);
     }
@@ -268,16 +266,15 @@ export default function Items() {
     { value: 'poor', label: 'Poor' },
   ];
 
+  // Get options from centralized store
+  const { getOptions, addOption, removeOption, isDefault } = useOptionsStore();
+  const inventoryCategories = getOptions('inventoryCategories');
+  const sellPlatforms = getOptions('sellPlatforms');
+  
   // Platform options for selling
   const platformOptions = [
     { value: '', label: 'Select platform...' },
-    { value: 'Facebook Marketplace', label: 'Facebook Marketplace' },
-    { value: 'Craigslist', label: 'Craigslist' },
-    { value: 'eBay', label: 'eBay' },
-    { value: 'OfferUp', label: 'OfferUp' },
-    { value: 'Nextdoor', label: 'Nextdoor' },
-    { value: 'Private Sale', label: 'Private Sale' },
-    { value: 'Other', label: 'Other' },
+    ...sellPlatforms.map(p => ({ value: p, label: p })),
   ];
 
   return (
@@ -685,7 +682,7 @@ export default function Items() {
               label="Category"
               name="category"
               required
-              options={categories.map(c => ({ value: c, label: c }))}
+              options={inventoryCategories.map(c => ({ value: c, label: c }))}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -744,7 +741,7 @@ export default function Items() {
                 name="category"
                 required
                 value={selectedItem.category}
-                options={categories.map(c => ({ value: c, label: c }))}
+                options={inventoryCategories.map(c => ({ value: c, label: c }))}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -873,16 +870,16 @@ export default function Items() {
           </div>
           
           <div className="max-h-64 overflow-y-auto space-y-1">
-            {categories.map((category) => (
+            {inventoryCategories.map((category) => (
               <div key={category} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/20">
                 <span className="text-foreground">{category}</span>
-                {!DEFAULT_CATEGORIES.includes(category) && (
+                {!isDefault('inventoryCategories', category) && (
                   <Button
                     size="sm"
                     variant="ghost"
                     className="text-destructive"
                     onClick={() => {
-                      removeCategory(category);
+                      removeOption('inventoryCategories', category);
                       toast.info('Category Removed', `"${category}" has been removed`);
                     }}
                   >
