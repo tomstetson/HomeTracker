@@ -49,7 +49,7 @@
 - **Vendors** - Directory of contractors, service providers, and suppliers
 - **Warranties** - Never miss a warranty expiration again
 - **Home Vitals** - Emergency shutoffs, paint colors, HVAC filter info, service history
-- **Documents** - Store manuals, receipts, and important documents
+- **Documents** - Store manuals, receipts, and important documents with **OCR search**
 - **Data Export** - View and download real-time Excel reports
 
 ### ✨ Technical Features
@@ -57,6 +57,8 @@
 - 📱 **Responsive Design** - Works great on desktop, tablet, and mobile
 - 🔄 **Auto-Sync** - Automatic data synchronization between browser and server
 - 💾 **Excel Export** - All data synced to `.xlsx` in real-time
+- 📄 **File Storage** - Upload receipts, manuals, photos with persistent storage
+- 🔍 **OCR Search** - Automatically extract text from images for searchability
 - 🐳 **Docker Ready** - Single container deployment
 - 🔒 **Self-Hosted** - Your data stays on your server
 
@@ -135,6 +137,7 @@ All data is stored in the `./data` directory:
 | [Backup Strategy](docs/BACKUP_STRATEGY.md) | 3-2-1 backup best practices |
 | [Homelab Architecture](docs/HOMELAB_ARCHITECTURE.md) | Docker vs VM guide |
 | [Roadmap](docs/V1_ROADMAP.md) | Feature roadmap |
+| [File Storage](docs/FILE_STORAGE.md) | Document storage & OCR |
 
 ## Tech Stack
 

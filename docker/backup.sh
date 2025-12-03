@@ -54,8 +54,11 @@ create_backup() {
     # Create backup filename
     BACKUP_FILE="$BACKUP_DIR/hometracker_${TIMESTAMP}.tar.gz"
     
-    # Create compressed backup
+    # Create compressed backup (includes files directory)
     log "Creating backup: $BACKUP_FILE"
+    log "  - JSON data"
+    log "  - Excel export"
+    log "  - Uploaded files"
     tar -czf "$BACKUP_FILE" -C "$DATA_DIR" .
     
     # Verify backup
