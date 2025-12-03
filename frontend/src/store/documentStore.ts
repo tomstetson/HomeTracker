@@ -14,6 +14,7 @@ export interface Document {
   tags?: string[];
   url?: string; // For future file upload
   notes?: string;
+  ocrText?: string; // Extracted text from OCR processing
 }
 
 const DEFAULT_DOCUMENTS: Document[] = [

@@ -24,6 +24,7 @@ import {
 import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
 import DataManager from './DataManager';
+import GlobalSearch from './GlobalSearch';
 
 interface LayoutProps {
   children: ReactNode;
@@ -263,6 +264,9 @@ export default function Layout({ children }: LayoutProps) {
 
             {/* Right Actions */}
             <div className="flex items-center space-x-2">
+              {/* Global Search */}
+              <GlobalSearch />
+              
               {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
