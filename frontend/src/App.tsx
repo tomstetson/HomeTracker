@@ -8,6 +8,7 @@ import Items from './pages/Items';
 import Vendors from './pages/Vendors';
 import Maintenance from './pages/Maintenance';
 import Documents from './pages/Documents';
+import HomeInfo from './pages/HomeInfo';
 import Settings from './pages/Settings';
 import { ToastContainer, useToast } from './components/ui/Toast';
 import { autoSync } from './lib/autoSync';
@@ -42,6 +43,7 @@ function AppContent() {
         <Route path="/maintenance" element={<Maintenance />} />
         <Route path="/vendors" element={<Vendors />} />
         <Route path="/documents" element={<Documents />} />
+        <Route path="/home-info" element={<HomeInfo />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>

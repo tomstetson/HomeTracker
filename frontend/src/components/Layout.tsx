@@ -16,6 +16,7 @@ import {
   Moon,
   ChevronLeft,
   ChevronRight,
+  Building2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
@@ -33,10 +34,9 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { resolvedTheme, toggleTheme } = useTheme();
 
-  // Streamlined navigation - 7 core modules
-  // Warranties integrated into Inventory
-  // Service History integrated into Maintenance
-  // Paint Colors, Emergency Info, Data/Backup consolidated into Settings
+  // Streamlined navigation - 8 core modules
+  // Home Info = Property details, value, paint colors, emergency info
+  // Settings = App config, API settings, data backup
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Projects', href: '/projects', icon: FolderKanban },
@@ -44,6 +44,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Maintenance', href: '/maintenance', icon: Wrench },
     { name: 'Vendors', href: '/vendors', icon: Users },
     { name: 'Documents', href: '/documents', icon: FileText },
+    { name: 'Home Info', href: '/home-info', icon: Building2 },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 

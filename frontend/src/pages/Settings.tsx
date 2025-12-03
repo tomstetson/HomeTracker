@@ -1,123 +1,39 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../lib/theme';
 import {
-  Home,
-  Ruler,
-  Users,
   Sun,
   Moon,
-  Save,
   Database,
   Download,
   Upload,
   Trash2,
   Settings as SettingsIcon,
-  TrendingUp,
-  Palette,
-  AlertTriangle,
-  Droplets,
-  Flame,
-  Zap,
-  Phone,
   HardDrive,
   Cloud,
   FileSpreadsheet,
+  Key,
+  ExternalLink,
+  Info,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import HomeValueTracker from '../components/HomeValueTracker';
-import { useHomeVitalsStore } from '../store/homeVitalsStore';
-
-// Property settings stored in localStorage
-interface PropertySettings {
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  propertyType: string;
-  yearBuilt: string;
-  squareFootage: string;
-  lotSize: string;
-  bedrooms: string;
-  bathrooms: string;
-  purchaseDate: string;
-  purchasePrice: string;
-  currentValue: string;
-  notes: string;
-  ownerName: string;
-  ownerEmail: string;
-  ownerPhone: string;
-}
-
-const DEFAULT_SETTINGS: PropertySettings = {
-  address: '',
-  city: '',
-  state: 'PA',
-  zipCode: '',
-  propertyType: 'Single Family Home',
-  yearBuilt: '',
-  squareFootage: '',
-  lotSize: '',
-  bedrooms: '',
-  bathrooms: '',
-  purchaseDate: '',
-  purchasePrice: '',
-  currentValue: '',
-  notes: '',
-  ownerName: '',
-  ownerEmail: '',
-  ownerPhone: '',
-};
 
 export default function Settings() {
   const toast = useToast();
   const { resolvedTheme, toggleTheme } = useTheme();
-  const [settings, setSettings] = useState<PropertySettings>(DEFAULT_SETTINGS);
-  const [hasChanges, setHasChanges] = useState(false);
-
-  // Home Vitals store for paint colors and emergency info
-  const {
-    paintColors,
-    homeVitals,
-    deletePaintColor,
-    updateHomeVitals,
-    deleteEmergencyContact,
-  } = useHomeVitalsStore();
+  const [apiEnabled, setApiEnabled] = useState(false);
 
   const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
-  // Load settings from localStorage
+  // Load API setting from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('hometracker_settings');
+    const stored = localStorage.getItem('hometracker_api_enabled');
     if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
-      } catch (error) {
-        console.error('Failed to load settings:', error);
-      }
+      setApiEnabled(JSON.parse(stored));
     }
   }, []);
-
-  // Save settings to localStorage
-  const saveSettings = () => {
-    try {
-      localStorage.setItem('hometracker_settings', JSON.stringify(settings));
-      setHasChanges(false);
-      toast.success('Settings Saved', 'Your property settings have been updated');
-    } catch (error) {
-      toast.error('Error', 'Failed to save settings');
-    }
-  };
-
-  // Handle input changes
-  const handleChange = (field: keyof PropertySettings, value: string) => {
-    setSettings((prev) => ({ ...prev, [field]: value }));
-    setHasChanges(true);
-  };
 
   // Export all data
   const exportAllData = () => {
@@ -125,11 +41,10 @@ export default function Settings() {
       const data: Record<string, any> = {
         version: '1.0',
         exportDate: new Date().toISOString(),
-        settings,
       };
 
       // Get all collections from localStorage
-      const collections = ['items', 'vendors', 'projects', 'maintenanceTasks', 'warranties', 'documents'];
+      const collections = ['items', 'vendors', 'projects', 'maintenanceTasks', 'warranties', 'documents', 'settings', 'homeVitals'];
       collections.forEach((key) => {
         const stored = localStorage.getItem(`hometracker_${key}`);
         if (stored) {
@@ -161,14 +76,8 @@ export default function Settings() {
       try {
         const data = JSON.parse(e.target?.result as string);
         
-        // Restore settings
-        if (data.settings) {
-          setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
-          localStorage.setItem('hometracker_settings', JSON.stringify(data.settings));
-        }
-
         // Restore collections
-        const collections = ['items', 'vendors', 'projects', 'maintenanceTasks', 'warranties', 'documents'];
+        const collections = ['items', 'vendors', 'projects', 'maintenanceTasks', 'warranties', 'documents', 'settings', 'homeVitals'];
         collections.forEach((key) => {
           if (data[key]) {
             localStorage.setItem(`hometracker_${key}`, JSON.stringify(data[key]));
@@ -189,25 +98,28 @@ export default function Settings() {
   // Clear all data
   const clearAllData = () => {
     if (confirm('Are you sure you want to delete ALL data? This cannot be undone.')) {
-      const keys = ['items', 'vendors', 'projects', 'maintenanceTasks', 'warranties', 'documents', 'settings'];
+      const keys = ['items', 'vendors', 'projects', 'maintenanceTasks', 'warranties', 'documents', 'settings', 'homeVitals'];
       keys.forEach((key) => localStorage.removeItem(`hometracker_${key}`));
-      setSettings(DEFAULT_SETTINGS);
       toast.success('Data Cleared', 'All data has been deleted. Please refresh the page.');
     }
+  };
+
+  // Toggle API setting
+  const handleApiToggle = (enabled: boolean) => {
+    setApiEnabled(enabled);
+    localStorage.setItem('hometracker_api_enabled', JSON.stringify(enabled));
+    toast.info(
+      enabled ? 'API Enabled' : 'API Disabled',
+      enabled ? 'External API calls are now allowed' : 'No external API calls will be made'
+    );
   };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
-          <p className="text-muted-foreground">Configure your property and app preferences</p>
-        </div>
-        <Button onClick={saveSettings} disabled={!hasChanges} className="flex items-center space-x-2">
-          <Save className="w-4 h-4" />
-          <span>Save Changes</span>
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
+        <p className="text-muted-foreground">App configuration and data management</p>
       </div>
 
       {/* Appearance */}
@@ -252,300 +164,52 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* Property Information */}
+      {/* API & Privacy */}
       <Card className="bg-card/80 backdrop-blur-sm border-border/50">
         <CardContent className="p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-            <Home className="w-5 h-5 mr-2" />
-            Property Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Street Address"
-              value={settings.address}
-              onChange={(e) => handleChange('address', e.target.value)}
-              placeholder="123 Main St"
-            />
-            <Input
-              label="City"
-              value={settings.city}
-              onChange={(e) => handleChange('city', e.target.value)}
-              placeholder="Anytown"
-            />
-            <Input
-              label="State"
-              value={settings.state}
-              onChange={(e) => handleChange('state', e.target.value)}
-              placeholder="PA"
-            />
-            <Input
-              label="ZIP Code"
-              value={settings.zipCode}
-              onChange={(e) => handleChange('zipCode', e.target.value)}
-              placeholder="12345"
-            />
-            <Input
-              label="Property Type"
-              value={settings.propertyType}
-              onChange={(e) => handleChange('propertyType', e.target.value)}
-              placeholder="Single Family Home"
-            />
-            <Input
-              label="Year Built"
-              value={settings.yearBuilt}
-              onChange={(e) => handleChange('yearBuilt', e.target.value)}
-              placeholder="1990"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Property Details */}
-      <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-        <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-            <Ruler className="w-5 h-5 mr-2" />
-            Property Details
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Input
-              label="Square Footage"
-              value={settings.squareFootage}
-              onChange={(e) => handleChange('squareFootage', e.target.value)}
-              placeholder="2,500"
-            />
-            <Input
-              label="Lot Size (acres)"
-              value={settings.lotSize}
-              onChange={(e) => handleChange('lotSize', e.target.value)}
-              placeholder="0.25"
-            />
-            <Input
-              label="Bedrooms"
-              value={settings.bedrooms}
-              onChange={(e) => handleChange('bedrooms', e.target.value)}
-              placeholder="4"
-            />
-            <Input
-              label="Bathrooms"
-              value={settings.bathrooms}
-              onChange={(e) => handleChange('bathrooms', e.target.value)}
-              placeholder="2.5"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Purchase Information */}
-      <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-        <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-            <Home className="w-5 h-5 mr-2" />
-            Purchase Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Purchase Date"
-              type="date"
-              value={settings.purchaseDate}
-              onChange={(e) => handleChange('purchaseDate', e.target.value)}
-            />
-            <Input
-              label="Purchase Price"
-              value={settings.purchasePrice}
-              onChange={(e) => handleChange('purchasePrice', e.target.value)}
-              placeholder="$350,000"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Home Value Tracking */}
-      <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-        <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-            <TrendingUp className="w-5 h-5 mr-2" />
-            Home Value Tracking
+            <Key className="w-5 h-5 mr-2" />
+            API & Privacy
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Track your home's value over time. Use manual entries or optionally connect to a property value API.
-          </p>
-          <HomeValueTracker />
-        </CardContent>
-      </Card>
-
-      {/* Paint Colors */}
-      <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center">
-              <Palette className="w-5 h-5 mr-2" />
-              Paint Colors
-            </h2>
-          </div>
-          <p className="text-sm text-muted-foreground mb-4">
-            Quick reference for paint colors used in your home.
+            Control external API connections for home value tracking and other features.
           </p>
           
-          {paintColors.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Palette className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>No paint colors saved yet</p>
+          <div className="p-4 bg-muted/20 rounded-lg border border-border/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-foreground">Allow External API Calls</p>
+                <p className="text-sm text-muted-foreground">
+                  {apiEnabled 
+                    ? '⚠️ Data may leave your homelab when fetching home values'
+                    : '✅ All data stays local - no external calls made'
+                  }
+                </p>
+              </div>
+              <button
+                onClick={() => handleApiToggle(!apiEnabled)}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  apiEnabled ? "bg-primary" : "bg-muted"
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                    apiEnabled ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </button>
             </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {paintColors.map((paint) => (
-                <div
-                  key={paint.id}
-                  className="p-3 bg-muted/20 rounded-lg border border-border/50 flex items-start gap-3"
-                >
-                  <div
-                    className="w-10 h-10 rounded-lg border border-border flex-shrink-0"
-                    style={{ backgroundColor: paint.hexColor || '#ccc' }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">{paint.room}</p>
-                    <p className="text-sm text-muted-foreground truncate">{paint.colorName}</p>
-                    <p className="text-xs text-muted-foreground">{paint.brand}</p>
-                  </div>
-                  <button
-                    onClick={() => deletePaintColor(paint.id)}
-                    className="text-muted-foreground hover:text-destructive p-1"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+          </div>
+
+          {apiEnabled && (
+            <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                <strong>Note:</strong> API keys are stored locally. Configure them in Home Info → Value tab.
+              </p>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Emergency Info */}
-      <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-        <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-            <AlertTriangle className="w-5 h-5 mr-2 text-amber-500" />
-            Emergency Information
-          </h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Know where to find shutoffs in an emergency.
-          </p>
-          
-          <div className="space-y-4">
-            {/* Water Shutoff */}
-            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Droplets className="w-4 h-4 text-blue-500" />
-                <span className="font-medium text-foreground">Water Main Shutoff</span>
-              </div>
-              <Input
-                placeholder="e.g., Basement, near water heater"
-                value={homeVitals.waterMain?.location || ''}
-                onChange={(e) => updateHomeVitals({ waterMain: { ...homeVitals.waterMain, location: e.target.value } })}
-                className="bg-background/50"
-              />
-            </div>
-
-            {/* Gas Shutoff */}
-            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Flame className="w-4 h-4 text-orange-500" />
-                <span className="font-medium text-foreground">Gas Shutoff</span>
-              </div>
-              <Input
-                placeholder="e.g., Outside, by meter"
-                value={homeVitals.gasShutoff?.location || ''}
-                onChange={(e) => updateHomeVitals({ gasShutoff: { ...homeVitals.gasShutoff, location: e.target.value } })}
-                className="bg-background/50"
-              />
-            </div>
-
-            {/* Electrical Panel */}
-            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="w-4 h-4 text-yellow-500" />
-                <span className="font-medium text-foreground">Electrical Panel</span>
-              </div>
-              <Input
-                placeholder="e.g., Garage, left wall"
-                value={homeVitals.electricalPanel?.location || ''}
-                onChange={(e) => updateHomeVitals({ electricalPanel: { ...homeVitals.electricalPanel, location: e.target.value } })}
-                className="bg-background/50"
-              />
-            </div>
-
-            {/* Emergency Contacts */}
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-red-500" />
-                  <span className="font-medium text-foreground">Emergency Contacts</span>
-                </div>
-              </div>
-              {homeVitals.emergencyContacts?.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-2">No emergency contacts added</p>
-              ) : (
-                <div className="space-y-2">
-                  {homeVitals.emergencyContacts?.map((contact) => (
-                    <div key={contact.id} className="flex items-center justify-between p-2 bg-background/50 rounded">
-                      <div>
-                        <p className="font-medium text-foreground text-sm">{contact.name}</p>
-                        <p className="text-xs text-muted-foreground">{contact.phone} • {contact.type}</p>
-                      </div>
-                      <button
-                        onClick={() => deleteEmergencyContact(contact.id)}
-                        className="text-muted-foreground hover:text-destructive p-1"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Owner Information */}
-      <Card className="bg-card/80 backdrop-blur-sm border-border/50">
-        <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-            <Users className="w-5 h-5 mr-2" />
-            Owner Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="Owner Name"
-              value={settings.ownerName}
-              onChange={(e) => handleChange('ownerName', e.target.value)}
-              placeholder="Your Name"
-            />
-            <Input
-              label="Email"
-              type="email"
-              value={settings.ownerEmail}
-              onChange={(e) => handleChange('ownerEmail', e.target.value)}
-              placeholder="tom@example.com"
-            />
-            <Input
-              label="Phone"
-              type="tel"
-              value={settings.ownerPhone}
-              onChange={(e) => handleChange('ownerPhone', e.target.value)}
-              placeholder="215-555-0100"
-            />
-          </div>
-          <div className="mt-4">
-            <Textarea
-              label="Notes"
-              value={settings.notes}
-              onChange={(e) => handleChange('notes', e.target.value)}
-              placeholder="Any additional notes about your property..."
-              rows={3}
-            />
-          </div>
         </CardContent>
       </Card>
 
@@ -631,19 +295,28 @@ export default function Settings() {
       {/* About */}
       <Card className="bg-card/80 backdrop-blur-sm border-border/50">
         <CardContent className="p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-2">About HomeTracker</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+            <Info className="w-5 h-5 mr-2" />
+            About HomeTracker
+          </h2>
           <p className="text-sm text-muted-foreground mb-4">
             HomeTracker is your complete home management solution. Track inventory, manage projects, 
             schedule maintenance, store documents, and never miss a warranty claim.
           </p>
-          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-            <span>Version 1.0.0</span>
-            <span>•</span>
-            <span>Built for {settings.address || 'Your Home'}, {settings.city || 'Your City'}, {settings.state || 'State'}</span>
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            <span className="px-2 py-1 bg-muted/30 rounded">Version 1.0.0</span>
+            <a 
+              href="https://github.com/tomstetson/HomeTracker" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-primary hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" />
+              GitHub
+            </a>
           </div>
         </CardContent>
       </Card>
     </div>
   );
 }
-
