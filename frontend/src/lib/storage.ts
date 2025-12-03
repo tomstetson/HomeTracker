@@ -13,6 +13,7 @@ export interface StorageData {
   maintenanceTasks: any[];
   warranties: any[];
   documents: any[];
+  categories: any[];
 }
 
 // Initialize storage with default data
@@ -28,6 +29,7 @@ export const initStorage = () => {
       maintenanceTasks: [],
       warranties: [],
       documents: [],
+      categories: [],
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
   }

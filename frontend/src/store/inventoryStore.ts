@@ -1,6 +1,27 @@
 import { create } from 'zustand';
 import { getCollection, saveCollection } from '../lib/storage';
 
+// Warranty info embedded in inventory item
+export interface ItemWarranty {
+  provider?: string;
+  policyNumber?: string;
+  startDate?: string;
+  endDate?: string;
+  coverageDetails?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  documentId?: string; // Link to uploaded warranty document
+}
+
+// Sale record for sold items
+export interface SaleRecord {
+  saleDate: string;
+  salePrice: number;
+  buyer?: string;
+  platform?: string; // e.g., "Facebook Marketplace", "Craigslist", "eBay", "Private"
+  notes?: string;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -13,11 +34,35 @@ export interface InventoryItem {
   purchasePrice?: number;
   currentValue?: number;
   condition: 'excellent' | 'good' | 'fair' | 'poor';
-  warrantyExpiration?: string;
   notes?: string;
   photos: string[];
   tags: string[];
+  
+  // Warranty info (integrated)
+  warranty?: ItemWarranty;
+  
+  // Sale tracking
+  status: 'active' | 'sold' | 'deleted';
+  sale?: SaleRecord;
+  
+  // Soft delete tracking
+  deletedAt?: string; // ISO date when moved to trash
 }
+
+// Default categories - user can add more
+export const DEFAULT_CATEGORIES = [
+  'Kitchen Appliances',
+  'Laundry',
+  'HVAC',
+  'Electronics',
+  'Furniture',
+  'Outdoor/Garden',
+  'Tools',
+  'Lighting',
+  'Plumbing',
+  'Security',
+  'Other',
+];
 
 const DEFAULT_ITEMS: InventoryItem[] = [
   {
@@ -32,10 +77,15 @@ const DEFAULT_ITEMS: InventoryItem[] = [
     purchasePrice: 2499,
     currentValue: 2000,
     condition: 'excellent',
-    warrantyExpiration: '2025-05-15',
     notes: 'French door model with ice maker',
     photos: [],
     tags: ['appliance', 'kitchen'],
+    status: 'active',
+    warranty: {
+      provider: 'Samsung',
+      endDate: '2025-05-15',
+      coverageDetails: '2-year manufacturer warranty',
+    },
   },
   {
     id: '2',
@@ -48,10 +98,15 @@ const DEFAULT_ITEMS: InventoryItem[] = [
     purchasePrice: 899,
     currentValue: 650,
     condition: 'good',
-    warrantyExpiration: '2023-08-20',
     notes: 'Front load, energy efficient',
     photos: [],
     tags: ['appliance', 'laundry'],
+    status: 'active',
+    warranty: {
+      provider: 'LG',
+      endDate: '2023-08-20',
+      coverageDetails: '1-year manufacturer warranty - EXPIRED',
+    },
   },
   {
     id: '3',
@@ -67,24 +122,66 @@ const DEFAULT_ITEMS: InventoryItem[] = [
     notes: 'Smart thermostat with learning capability',
     photos: [],
     tags: ['smart-home', 'hvac'],
+    status: 'active',
   },
 ];
 
 interface InventoryStore {
   items: InventoryItem[];
+  categories: string[];
   isLoading: boolean;
+  
+  // Items CRUD
   setItems: (items: InventoryItem[]) => void;
   addItem: (item: InventoryItem) => void;
   updateItem: (id: string, updates: Partial<InventoryItem>) => void;
-  deleteItem: (id: string) => void;
+  
+  // Soft delete & restore
+  softDeleteItem: (id: string) => void;
+  restoreItem: (id: string) => void;
+  permanentlyDeleteItem: (id: string) => void;
+  emptyTrash: () => void;
+  
+  // Sell item
+  sellItem: (id: string, sale: SaleRecord) => void;
+  
+  // Categories management
+  addCategory: (category: string) => void;
+  removeCategory: (category: string) => void;
+  setCategories: (categories: string[]) => void;
+  
+  // Queries
+  getActiveItems: () => InventoryItem[];
+  getSoldItems: () => InventoryItem[];
+  getDeletedItems: () => InventoryItem[];
+  getExpiringWarranties: (daysAhead?: number) => InventoryItem[];
   searchItems: (query: string) => InventoryItem[];
   filterByCategory: (category: string) => InventoryItem[];
+  
+  // Stats
+  getTotalValue: () => number;
+  getTotalSaleRecoup: () => { totalPurchase: number; totalSale: number; profit: number };
+  
+  // Storage
   loadFromStorage: () => void;
   saveToStorage: () => void;
 }
 
+// Helper to clean up old trash items (180 days)
+const TRASH_RETENTION_DAYS = 180;
+const cleanupOldTrash = (items: InventoryItem[]): InventoryItem[] => {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - TRASH_RETENTION_DAYS);
+  
+  return items.filter((item) => {
+    if (item.status !== 'deleted' || !item.deletedAt) return true;
+    return new Date(item.deletedAt) > cutoffDate;
+  });
+};
+
 export const useInventoryStore = create<InventoryStore>((set, get) => ({
   items: [],
+  categories: [...DEFAULT_CATEGORIES],
   isLoading: true,
   
   setItems: (items) => {
@@ -93,7 +190,8 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
   },
   
   addItem: (item) => {
-    set((state) => ({ items: [...state.items, item] }));
+    const newItem = { ...item, status: item.status || 'active' as const };
+    set((state) => ({ items: [...state.items, newItem] }));
     get().saveToStorage();
   },
   
@@ -104,48 +202,166 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
     get().saveToStorage();
   },
   
-  deleteItem: (id) => {
+  // Soft delete - moves to trash
+  softDeleteItem: (id) => {
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.id === id
+          ? { ...item, status: 'deleted' as const, deletedAt: new Date().toISOString() }
+          : item
+      ),
+    }));
+    get().saveToStorage();
+  },
+  
+  // Restore from trash
+  restoreItem: (id) => {
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.id === id
+          ? { ...item, status: 'active' as const, deletedAt: undefined }
+          : item
+      ),
+    }));
+    get().saveToStorage();
+  },
+  
+  // Permanent delete
+  permanentlyDeleteItem: (id) => {
     set((state) => ({ items: state.items.filter((item) => item.id !== id) }));
     get().saveToStorage();
   },
   
+  // Empty all trash
+  emptyTrash: () => {
+    set((state) => ({ items: state.items.filter((item) => item.status !== 'deleted') }));
+    get().saveToStorage();
+  },
+  
+  // Mark as sold with sale record
+  sellItem: (id, sale) => {
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.id === id
+          ? { ...item, status: 'sold' as const, sale }
+          : item
+      ),
+    }));
+    get().saveToStorage();
+  },
+  
+  // Category management
+  addCategory: (category) => {
+    const trimmed = category.trim();
+    if (!trimmed) return;
+    set((state) => {
+      if (state.categories.includes(trimmed)) return state;
+      return { categories: [...state.categories, trimmed].sort() };
+    });
+    get().saveToStorage();
+  },
+  
+  removeCategory: (category) => {
+    set((state) => ({
+      categories: state.categories.filter((c) => c !== category),
+    }));
+    get().saveToStorage();
+  },
+  
+  setCategories: (categories) => {
+    set({ categories });
+    get().saveToStorage();
+  },
+  
+  // Query helpers
+  getActiveItems: () => get().items.filter((item) => item.status === 'active'),
+  getSoldItems: () => get().items.filter((item) => item.status === 'sold'),
+  getDeletedItems: () => get().items.filter((item) => item.status === 'deleted'),
+  
+  getExpiringWarranties: (daysAhead = 90) => {
+    const today = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(today.getDate() + daysAhead);
+    
+    return get().items.filter((item) => {
+      if (item.status !== 'active' || !item.warranty?.endDate) return false;
+      const endDate = new Date(item.warranty.endDate);
+      return endDate >= today && endDate <= futureDate;
+    });
+  },
+  
   searchItems: (query) => {
-    const items = get().items;
+    const items = get().getActiveItems();
     const lowerQuery = query.toLowerCase();
     return items.filter(
       (item) =>
         item.name.toLowerCase().includes(lowerQuery) ||
         item.category.toLowerCase().includes(lowerQuery) ||
         item.brand?.toLowerCase().includes(lowerQuery) ||
-        item.location.toLowerCase().includes(lowerQuery)
+        item.location.toLowerCase().includes(lowerQuery) ||
+        item.modelNumber?.toLowerCase().includes(lowerQuery) ||
+        item.serialNumber?.toLowerCase().includes(lowerQuery)
     );
   },
   
   filterByCategory: (category) => {
-    const items = get().items;
+    const items = get().getActiveItems();
     return items.filter((item) => item.category === category);
+  },
+  
+  // Stats
+  getTotalValue: () => {
+    return get().getActiveItems().reduce((sum, item) => sum + (item.currentValue || item.purchasePrice || 0), 0);
+  },
+  
+  getTotalSaleRecoup: () => {
+    const soldItems = get().getSoldItems();
+    const totalPurchase = soldItems.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
+    const totalSale = soldItems.reduce((sum, item) => sum + (item.sale?.salePrice || 0), 0);
+    return {
+      totalPurchase,
+      totalSale,
+      profit: totalSale - totalPurchase,
+    };
   },
   
   loadFromStorage: () => {
     try {
       const stored = getCollection('items');
+      const storedCategories = getCollection('categories');
+      
       if (stored && stored.length > 0) {
-        set({ items: stored, isLoading: false });
+        // Clean up old trash items
+        const cleaned = cleanupOldTrash(stored);
+        // Migrate old items that don't have status field
+        const migrated = cleaned.map((item: any) => ({
+          ...item,
+          status: item.status || 'active',
+        }));
+        set({ 
+          items: migrated, 
+          categories: storedCategories?.length > 0 ? storedCategories : DEFAULT_CATEGORIES,
+          isLoading: false 
+        });
+        // Save if cleanup happened
+        if (cleaned.length !== stored.length) {
+          get().saveToStorage();
+        }
       } else {
-        // First time - load default items
-        set({ items: DEFAULT_ITEMS, isLoading: false });
+        set({ items: DEFAULT_ITEMS, categories: DEFAULT_CATEGORIES, isLoading: false });
         get().saveToStorage();
       }
     } catch (error) {
       console.error('Failed to load items:', error);
-      set({ items: DEFAULT_ITEMS, isLoading: false });
+      set({ items: DEFAULT_ITEMS, categories: DEFAULT_CATEGORIES, isLoading: false });
     }
   },
   
   saveToStorage: () => {
     try {
-      const items = get().items;
+      const { items, categories } = get();
       saveCollection('items', items);
+      saveCollection('categories', categories);
     } catch (error) {
       console.error('Failed to save items:', error);
     }
