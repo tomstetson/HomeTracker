@@ -21,6 +21,11 @@ export interface HomeTrackerData {
   maintenance: any[];
   documents: any[];
   settings: any;
+  customOptions: any;
+  homeVitals: any;
+  homeValues: any[];
+  paintColors: any[];
+  emergencyContacts: any[];
   lastUpdated: string;
 }
 
@@ -32,13 +37,12 @@ const DEFAULT_DATA: HomeTrackerData = {
   warranties: [],
   maintenance: [],
   documents: [],
-  settings: {
-    address: '1300 Murphy Ln',
-    city: 'Warrington',
-    state: 'PA',
-    zipCode: '18976',
-    propertyType: 'Single Family Home',
-  },
+  settings: {},
+  customOptions: {},
+  homeVitals: {},
+  homeValues: [],
+  paintColors: [],
+  emergencyContacts: [],
   lastUpdated: new Date().toISOString(),
 };
 
@@ -153,6 +157,51 @@ const SHEET_CONFIGS: Record<string, { columns: Partial<ExcelJS.Column>[]; header
       { header: 'Value', key: 'value', width: 40 },
     ],
   },
+  HomeValues: {
+    headerColor: 'FF228B22',
+    columns: [
+      { header: 'Date', key: 'date', width: 12 },
+      { header: 'Value', key: 'value', width: 15 },
+      { header: 'Source', key: 'source', width: 20 },
+      { header: 'Notes', key: 'notes', width: 40 },
+    ],
+  },
+  PaintColors: {
+    headerColor: 'FFDA70D6',
+    columns: [
+      { header: 'ID', key: 'id', width: 15 },
+      { header: 'Room', key: 'room', width: 20 },
+      { header: 'Color Name', key: 'colorName', width: 25 },
+      { header: 'Brand', key: 'brand', width: 20 },
+      { header: 'Color Code', key: 'colorCode', width: 15 },
+      { header: 'Hex', key: 'hexColor', width: 10 },
+      { header: 'Finish', key: 'finish', width: 15 },
+    ],
+  },
+  EmergencyContacts: {
+    headerColor: 'FFDC143C',
+    columns: [
+      { header: 'ID', key: 'id', width: 15 },
+      { header: 'Name', key: 'name', width: 25 },
+      { header: 'Phone', key: 'phone', width: 15 },
+      { header: 'Type', key: 'type', width: 15 },
+      { header: 'Notes', key: 'notes', width: 40 },
+    ],
+  },
+  SalesHistory: {
+    headerColor: 'FF9370DB',
+    columns: [
+      { header: 'Item ID', key: 'itemId', width: 15 },
+      { header: 'Item Name', key: 'itemName', width: 30 },
+      { header: 'Sale Date', key: 'saleDate', width: 12 },
+      { header: 'Sale Price', key: 'salePrice', width: 12 },
+      { header: 'Purchase Price', key: 'purchasePrice', width: 15 },
+      { header: 'Profit/Loss', key: 'profitLoss', width: 12 },
+      { header: 'Buyer', key: 'buyer', width: 20 },
+      { header: 'Platform', key: 'platform', width: 20 },
+      { header: 'Notes', key: 'notes', width: 40 },
+    ],
+  },
 };
 
 class ExcelService {
@@ -223,6 +272,26 @@ class ExcelService {
     this.createSheet(workbook, 'Warranties', this.data.warranties);
     this.createSheet(workbook, 'Maintenance', this.data.maintenance);
     this.createSheet(workbook, 'Documents', this.data.documents);
+    this.createSheet(workbook, 'HomeValues', this.data.homeValues || []);
+    this.createSheet(workbook, 'PaintColors', this.data.paintColors || []);
+    this.createSheet(workbook, 'EmergencyContacts', this.data.emergencyContacts || []);
+    
+    // Create sales history from sold items
+    const salesHistory = (this.data.items || [])
+      .filter((item: any) => item.status === 'sold' && item.sale)
+      .map((item: any) => ({
+        itemId: item.id,
+        itemName: item.name,
+        saleDate: item.sale?.saleDate,
+        salePrice: item.sale?.salePrice,
+        purchasePrice: item.purchasePrice,
+        profitLoss: (item.sale?.salePrice || 0) - (item.purchasePrice || 0),
+        buyer: item.sale?.buyer,
+        platform: item.sale?.platform,
+        notes: item.sale?.notes,
+      }));
+    this.createSheet(workbook, 'SalesHistory', salesHistory);
+    
     this.createSettingsSheet(workbook);
 
     await workbook.xlsx.writeFile(EXCEL_FILE);

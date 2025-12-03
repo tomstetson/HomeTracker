@@ -44,13 +44,16 @@
 
 ### 📋 Core Modules
 - **Project Tracker** - Kanban board with drag-and-drop, budgets, progress tracking, and tags
-- **Inventory** - Track appliances, furniture, electronics with locations and values
+- **Inventory** - Track appliances, furniture, electronics with warranties attached per item
+  - 🆕 **Sell Tracking** - Log sales, track profit/loss vs purchase price
+  - 🆕 **Soft Delete** - 180-day trash retention before permanent deletion
+  - 🆕 **Custom Categories** - Add/remove categories and selling platforms
 - **Maintenance** - Schedule tasks with priorities and due dates
-- **Vendors** - Directory of contractors, service providers, and suppliers
-- **Warranties** - Never miss a warranty expiration again
-- **Home Vitals** - Emergency shutoffs, paint colors, HVAC filter info, service history
+  - 🆕 **Service History** - View all completed maintenance with cost tracking
+- **Vendors** - Directory of contractors with customizable categories
+- **Home Info** - Property details, value tracking, paint colors, emergency contacts
 - **Documents** - Store manuals, receipts, and important documents with **OCR search**
-- **Data Export** - View and download real-time Excel reports
+- **Settings** - App configuration, data management, backup options
 
 ### ✨ Technical Features
 - 🌙 **Dark/Light Mode** - Beautiful UI with full theme support

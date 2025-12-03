@@ -2,6 +2,53 @@
 
 All notable changes to HomeTracker will be documented in this file.
 
+## [1.1.0] - 2024-12-03
+
+### 🚀 New Features
+
+#### Inventory Enhancements
+- **Warranties per Item** - Attach warranty details (provider, policy #, end date) directly to inventory items
+- **Sell Item Tracking** - Log sales with price, buyer, platform; track profit/loss
+- **Soft Delete / Trash** - Items move to trash (180-day retention) before permanent deletion
+- **Custom Categories** - Add/remove inventory categories via UI
+- **Sale Platforms** - Customizable list of selling platforms (eBay, Facebook Marketplace, etc.)
+
+#### Maintenance Service History
+- **Tasks/History Toggle** - View mode switching between active tasks and service history
+- **Service History Stats** - Track total completed, total spent, this year's costs
+- **History Search & Filter** - Search and filter by category
+- **Completion Details** - Log who performed work (DIY or vendor), actual cost, notes
+
+#### Home Info Improvements
+- **Simplified Value Tracking** - Inline home value entry (removed separate API dialog)
+- **Paint Colors Tab** - Renamed from "Reference" for clarity
+- **Emergency Contacts** - Clear Add/Edit UI with editable contact types
+- **Utility Shutoffs** - Track water, gas, electrical panel locations
+
+#### Centralized Options System
+- **Options Store** - All customizable dropdowns managed centrally
+- **EditableSelect Component** - Reusable component for customizable options
+- **Vendor Categories** - Add/remove custom vendor types
+- **Sync to Storage** - Custom options persist with all app data
+
+#### Excel Export Updates
+- **Home Values Sheet** - Track value history over time
+- **Paint Colors Sheet** - All paint colors with room, brand, hex code
+- **Emergency Contacts Sheet** - Emergency contact list
+- **Sales History Sheet** - Auto-generated from sold inventory items
+
+### 🔧 Improvements
+- Custom delete confirmation dialogs (replaces browser prompts)
+- Better dark mode support across all pages
+- Improved responsive design
+- Fixed various TypeScript errors
+
+### 🗑️ Removed
+- Deprecated HomeVitals.tsx (consolidated into HomeInfo)
+- Hardcoded category/platform lists
+
+---
+
 ## [1.0.0] - 2024-12-03
 
 ### 🎉 Initial Release
@@ -18,16 +65,15 @@ HomeTracker v1.0 - The complete home management solution for homelabbers.
 - **Inventory** - Track appliances, furniture, electronics
 - **Maintenance** - Schedule and track home maintenance tasks
 - **Vendors** - Directory of contractors and service providers
-- **Warranties** - Track warranty dates and coverage
-- **Home Vitals** - Emergency shutoffs, paint colors, service history
 - **Documents** - Store and organize home documents
-- **Data Export** - View and download Excel reports
-- **Backup** - Backup status and commands reference
+- **Home Info** - Property details, value tracking, emergency info
+- **Settings** - App configuration, data management, backup
 
 #### UI/UX
 - Full dark/light mode support
 - Responsive design for all screen sizes
 - Modern glass-morphism design
+- Global search (⌘K / Ctrl+K)
 - Toast notifications
 - Form validation with Zod
 
@@ -57,7 +103,6 @@ HomeTracker v1.0 - The complete home management solution for homelabbers.
 - Deployment guide for homelab
 - Storage options documentation
 - Backup strategy guide
-- Homelab architecture guide
 
 ### Technical Stack
 - **Frontend**: React 18, Vite, Tailwind CSS, Zustand
@@ -69,16 +114,12 @@ HomeTracker v1.0 - The complete home management solution for homelabbers.
 
 ## Roadmap
 
-### [1.1.0] - Planned
-- SQLite database option
-- Recurring maintenance reminders
-- Email notifications
+### [1.2.0] - Planned
+- OCR for receipts and documents
+- Email notifications for maintenance
 - PWA support for mobile
 
 ### [2.0.0] - Future
 - Multi-user support
 - Optional PostgreSQL backend
-- Photo storage
-- Receipt OCR
-- Home value tracking
-
+- Photo storage improvements
