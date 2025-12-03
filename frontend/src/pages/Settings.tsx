@@ -6,7 +6,6 @@ import { useToast } from '../components/ui/Toast';
 import { useTheme } from '../lib/theme';
 import {
   Home,
-  DollarSign,
   Ruler,
   Users,
   Sun,
@@ -17,8 +16,10 @@ import {
   Upload,
   Trash2,
   Settings as SettingsIcon,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import HomeValueTracker from '../components/HomeValueTracker';
 
 // Property settings stored in localStorage
 interface PropertySettings {
@@ -314,14 +315,14 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      {/* Financial Information */}
+      {/* Purchase Information */}
       <Card className="bg-card/80 backdrop-blur-sm border-border/50">
         <CardContent className="p-6">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-            <DollarSign className="w-5 h-5 mr-2" />
-            Financial Information
+            <Home className="w-5 h-5 mr-2" />
+            Purchase Information
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Purchase Date"
               type="date"
@@ -334,13 +335,21 @@ export default function Settings() {
               onChange={(e) => handleChange('purchasePrice', e.target.value)}
               placeholder="$350,000"
             />
-            <Input
-              label="Current Estimated Value"
-              value={settings.currentValue}
-              onChange={(e) => handleChange('currentValue', e.target.value)}
-              placeholder="$425,000"
-            />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Home Value Tracking */}
+      <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+        <CardContent className="p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+            <TrendingUp className="w-5 h-5 mr-2" />
+            Home Value Tracking
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Track your home's value over time. Use manual entries or optionally connect to a property value API.
+          </p>
+          <HomeValueTracker />
         </CardContent>
       </Card>
 
