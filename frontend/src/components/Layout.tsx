@@ -5,7 +5,6 @@ import {
   FolderKanban,
   Package,
   Wrench,
-  Shield,
   FileText,
   Menu,
   X,
@@ -17,9 +16,6 @@ import {
   Moon,
   ChevronLeft,
   ChevronRight,
-  FileSpreadsheet,
-  Heart,
-  HardDrive,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
@@ -37,17 +33,17 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { resolvedTheme, toggleTheme } = useTheme();
 
+  // Streamlined navigation - 7 core modules
+  // Warranties integrated into Inventory
+  // Service History integrated into Maintenance
+  // Paint Colors, Emergency Info, Data/Backup consolidated into Settings
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Projects', href: '/projects', icon: FolderKanban },
     { name: 'Inventory', href: '/items', icon: Package },
     { name: 'Maintenance', href: '/maintenance', icon: Wrench },
     { name: 'Vendors', href: '/vendors', icon: Users },
-    { name: 'Warranties', href: '/warranties', icon: Shield },
-    { name: 'Home Vitals', href: '/home-vitals', icon: Heart },
     { name: 'Documents', href: '/documents', icon: FileText },
-    { name: 'Data Export', href: '/data', icon: FileSpreadsheet },
-    { name: 'Backup', href: '/backup', icon: HardDrive },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 

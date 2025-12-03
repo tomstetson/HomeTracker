@@ -7,12 +7,8 @@ import Projects from './pages/Projects';
 import Items from './pages/Items';
 import Vendors from './pages/Vendors';
 import Maintenance from './pages/Maintenance';
-import Warranties from './pages/Warranties';
 import Documents from './pages/Documents';
 import Settings from './pages/Settings';
-import ExcelViewer from './pages/ExcelViewer';
-import HomeVitals from './pages/HomeVitals';
-import Backup from './pages/Backup';
 import { ToastContainer, useToast } from './components/ui/Toast';
 import { autoSync } from './lib/autoSync';
 
@@ -39,17 +35,14 @@ function AppContent() {
   return (
     <Layout>
       <Routes>
+        {/* Core modules - streamlined navigation */}
         <Route path="/" element={<Dashboard />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/items" element={<Items />} />
-        <Route path="/vendors" element={<Vendors />} />
         <Route path="/maintenance" element={<Maintenance />} />
-        <Route path="/warranties" element={<Warranties />} />
+        <Route path="/vendors" element={<Vendors />} />
         <Route path="/documents" element={<Documents />} />
-        <Route path="/home-vitals" element={<HomeVitals />} />
-<Route path="/settings" element={<Settings />} />
-            <Route path="/data" element={<ExcelViewer />} />
-            <Route path="/backup" element={<Backup />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>
   );
