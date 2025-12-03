@@ -143,14 +143,16 @@ export default function Documents() {
   }, []);
 
   // Get file icon
-  const getFileIcon = (fileType: string) => {
-    if (fileType.includes('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileType)) {
+  const getFileIcon = (fileType: string | undefined) => {
+    if (!fileType) return <File className="w-5 h-5 text-gray-500" />;
+    const type = fileType.toLowerCase();
+    if (type.includes('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(type)) {
       return <FileImage className="w-5 h-5 text-purple-500" />;
     }
-    if (fileType.includes('pdf')) {
+    if (type.includes('pdf')) {
       return <FileText className="w-5 h-5 text-red-500" />;
     }
-    if (fileType.includes('excel') || fileType.includes('spreadsheet') || ['xls', 'xlsx', 'csv'].includes(fileType)) {
+    if (type.includes('excel') || type.includes('spreadsheet') || ['xls', 'xlsx', 'csv'].includes(type)) {
       return <FileSpreadsheet className="w-5 h-5 text-green-500" />;
     }
     return <File className="w-5 h-5 text-gray-500" />;
