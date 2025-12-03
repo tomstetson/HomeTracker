@@ -17,8 +17,9 @@ import {
   ChevronDown, ChevronRight
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
+import HomeValueTracker from '../components/HomeValueTracker';
 
-type TabType = 'vitals' | 'paint' | 'service';
+type TabType = 'vitals' | 'paint' | 'service' | 'value';
 
 export default function HomeVitals() {
   const toast = useToast();
@@ -160,6 +161,7 @@ export default function HomeVitals() {
     { id: 'vitals', label: 'Emergency Info', icon: AlertTriangle },
     { id: 'paint', label: 'Paint Colors', icon: Palette },
     { id: 'service', label: 'Service History', icon: Wrench },
+    { id: 'value', label: 'Home Value', icon: DollarSign },
   ];
 
   return (
@@ -562,6 +564,11 @@ export default function HomeVitals() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Home Value Tab */}
+      {activeTab === 'value' && (
+        <HomeValueTracker />
       )}
 
       {/* Paint Color Dialog */}
