@@ -1,0 +1,28 @@
+# HomeTracker - Development Docker Compose
+# For local development with hot reload
+#
+# Usage:
+#   docker-compose -f docker-compose.dev.yml up -d
+#
+# This runs the backend in Docker while frontend runs locally
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: hometracker-backend-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend/src:/app/src
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - TZ=America/New_York
+    command: npm run dev
+

@@ -1,0 +1,51 @@
+# HomeTracker - Production Docker Compose
+# Optimized for homelab deployment
+# 
+# Usage:
+#   docker-compose up -d
+#   
+# Access:
+#   http://<your-server-ip>:8080
+#
+# Data is persisted in ./data directory
+
+version: '3.8'
+
+services:
+  hometracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hometracker
+    restart: unless-stopped
+    ports:
+      - "8080:80"      # Web UI
+      - "3001:3001"    # API (optional, for direct API access)
+    volumes:
+      # Persistent data storage - CRITICAL for not losing data
+      - ./data:/app/backend/data
+      # Optional: Mount for backups
+      - ./backups:/app/backups
+    environment:
+      - NODE_ENV=production
+      - TZ=America/New_York
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Resource limits for homelab efficiency
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
