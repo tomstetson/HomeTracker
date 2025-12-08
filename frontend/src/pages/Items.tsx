@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useInventoryStore, InventoryItem, SaleRecord } from '../store/inventoryStore';
+import { useInventoryStore, InventoryItem, SaleRecord, ConsumableInfo } from '../store/inventoryStore';
 import { useOptionsStore } from '../store/optionsStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -23,6 +23,8 @@ import {
   Shield,
   Settings,
   Tag,
+  RefreshCw,
+  Warehouse,
 } from 'lucide-react';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 
@@ -142,6 +144,37 @@ export default function Items() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
+    // Build consumable info if checkbox is checked or has data
+    const isConsumable = formData.get('isConsumable') === 'on';
+    const partStorageLocation = formData.get('partStorageLocation') as string;
+    const stockQuantity = formData.get('stockQuantity') as string;
+    const replacementInterval = formData.get('replacementInterval') as string;
+    const lastReplaced = formData.get('lastReplaced') as string;
+    const reorderUrl = formData.get('reorderUrl') as string;
+    const linkedApplianceId = formData.get('linkedApplianceId') as string;
+    
+    let consumableInfo: ConsumableInfo | undefined;
+    if (isConsumable || partStorageLocation || stockQuantity) {
+      // Calculate next replacement date if we have interval and last replaced
+      let nextReplacementDate: string | undefined;
+      if (lastReplaced && replacementInterval) {
+        const next = new Date(lastReplaced);
+        next.setMonth(next.getMonth() + parseInt(replacementInterval));
+        nextReplacementDate = next.toISOString().split('T')[0];
+      }
+      
+      consumableInfo = {
+        isConsumable: true,
+        replacementStorageLocation: partStorageLocation || undefined,
+        stockQuantity: stockQuantity ? parseInt(stockQuantity) : undefined,
+        replacementIntervalMonths: replacementInterval ? parseInt(replacementInterval) : undefined,
+        lastReplacedDate: lastReplaced || undefined,
+        nextReplacementDate,
+        reorderUrl: reorderUrl || undefined,
+        linkedApplianceId: linkedApplianceId || undefined,
+      };
+    }
+    
     const newItem: InventoryItem = {
       id: Date.now().toString(),
       name: formData.get('name') as string,
@@ -164,6 +197,7 @@ export default function Items() {
         coverageDetails: formData.get('warrantyCoverage') as string || undefined,
         policyNumber: formData.get('warrantyPolicyNumber') as string || undefined,
       },
+      consumableInfo,
     };
 
     // Clean up empty warranty
@@ -181,6 +215,37 @@ export default function Items() {
     if (!selectedItem) return;
     
     const formData = new FormData(e.currentTarget);
+    
+    // Build consumable info
+    const isConsumable = formData.get('isConsumable') === 'on';
+    const partStorageLocation = formData.get('partStorageLocation') as string;
+    const stockQuantity = formData.get('stockQuantity') as string;
+    const replacementInterval = formData.get('replacementInterval') as string;
+    const lastReplaced = formData.get('lastReplaced') as string;
+    const reorderUrl = formData.get('reorderUrl') as string;
+    const linkedApplianceId = formData.get('linkedApplianceId') as string;
+    
+    let consumableInfo: ConsumableInfo | undefined;
+    if (isConsumable || partStorageLocation || stockQuantity) {
+      // Calculate next replacement date if we have interval and last replaced
+      let nextReplacementDate: string | undefined = selectedItem.consumableInfo?.nextReplacementDate;
+      if (lastReplaced && replacementInterval) {
+        const next = new Date(lastReplaced);
+        next.setMonth(next.getMonth() + parseInt(replacementInterval));
+        nextReplacementDate = next.toISOString().split('T')[0];
+      }
+      
+      consumableInfo = {
+        isConsumable: true,
+        replacementStorageLocation: partStorageLocation || undefined,
+        stockQuantity: stockQuantity ? parseInt(stockQuantity) : undefined,
+        replacementIntervalMonths: replacementInterval ? parseInt(replacementInterval) : undefined,
+        lastReplacedDate: lastReplaced || undefined,
+        nextReplacementDate,
+        reorderUrl: reorderUrl || undefined,
+        linkedApplianceId: linkedApplianceId || undefined,
+      };
+    }
     
     const updates: Partial<InventoryItem> = {
       name: formData.get('name') as string,
@@ -200,6 +265,7 @@ export default function Items() {
         coverageDetails: formData.get('warrantyCoverage') as string || undefined,
         policyNumber: formData.get('warrantyPolicyNumber') as string || undefined,
       },
+      consumableInfo,
     };
 
     updateItem(selectedItem.id, updates);
@@ -543,6 +609,38 @@ export default function Items() {
                       Sold: {formatCurrency(item.sale.salePrice)} on {formatDate(item.sale.saleDate)}
                     </div>
                   )}
+                  {item.consumableInfo?.isConsumable && (
+                    <>
+                      <div className="flex items-center gap-2 text-amber-500">
+                        <RefreshCw className="w-3 h-3" />
+                        Consumable
+                        {item.consumableInfo.nextReplacementDate && (
+                          <span className={cn(
+                            "text-xs",
+                            new Date(item.consumableInfo.nextReplacementDate) < new Date() && "text-red-500"
+                          )}>
+                            • Due: {formatDate(item.consumableInfo.nextReplacementDate)}
+                          </span>
+                        )}
+                      </div>
+                      {item.consumableInfo.replacementStorageLocation && (
+                        <div className="flex items-center gap-2 text-blue-500">
+                          <Warehouse className="w-3 h-3" />
+                          Spares: {item.consumableInfo.replacementStorageLocation}
+                          {item.consumableInfo.stockQuantity !== undefined && (
+                            <span className={cn(
+                              "px-1.5 py-0.5 text-xs rounded",
+                              item.consumableInfo.stockQuantity === 0 
+                                ? "bg-red-500/20 text-red-500" 
+                                : "bg-blue-500/20"
+                            )}>
+                              {item.consumableInfo.stockQuantity} in stock
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 {/* Actions */}
@@ -721,6 +819,68 @@ export default function Items() {
             </div>
           </div>
 
+          {/* Consumable/Replacement Part Section */}
+          <div className="p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
+            <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-amber-500" />
+              Replacement Part Tracking (Optional)
+            </h4>
+            <p className="text-xs text-muted-foreground mb-3">
+              For items that need periodic replacement (filters, batteries, etc.)
+            </p>
+            <div className="space-y-4">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="isConsumable" className="rounded border-border" />
+                <span className="text-sm text-foreground">This is a consumable/replacement part</span>
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <Input 
+                  label="Spare Parts Storage Location" 
+                  name="partStorageLocation" 
+                  placeholder="e.g., Garage cabinet, Under sink" 
+                />
+                <Input 
+                  label="Stock Quantity" 
+                  name="stockQuantity" 
+                  type="number" 
+                  min="0"
+                  placeholder="How many spares?" 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input 
+                  label="Replacement Interval (months)" 
+                  name="replacementInterval" 
+                  type="number" 
+                  min="1"
+                  placeholder="e.g., 6 for every 6 months" 
+                />
+                <Input 
+                  label="Last Replaced" 
+                  name="lastReplaced" 
+                  type="date" 
+                />
+              </div>
+              <Input 
+                label="Reorder URL (Optional)" 
+                name="reorderUrl" 
+                type="url"
+                placeholder="https://amazon.com/..." 
+              />
+              <Select
+                label="Linked Appliance (Optional)"
+                name="linkedApplianceId"
+                options={[
+                  { value: '', label: 'Select appliance this part is for...' },
+                  ...getActiveItems().map(item => ({ 
+                    value: item.id, 
+                    label: `${item.name}${item.location ? ` (${item.location})` : ''}` 
+                  }))
+                ]}
+              />
+            </div>
+          </div>
+
           <Textarea label="Notes" name="notes" placeholder="Any additional notes..." rows={2} />
           
           <DialogFooter>
@@ -778,6 +938,81 @@ export default function Items() {
               <div className="grid grid-cols-2 gap-4 mt-4">
                 <Input label="Policy Number" name="warrantyPolicyNumber" defaultValue={selectedItem.warranty?.policyNumber} />
                 <Input label="Coverage Details" name="warrantyCoverage" defaultValue={selectedItem.warranty?.coverageDetails} />
+              </div>
+            </div>
+
+            {/* Consumable/Replacement Part Section */}
+            <div className="p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
+              <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-amber-500" />
+                Replacement Part Tracking
+              </h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                For items that need periodic replacement (filters, batteries, etc.)
+              </p>
+              <div className="space-y-4">
+                <label className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    name="isConsumable" 
+                    className="rounded border-border" 
+                    defaultChecked={selectedItem.consumableInfo?.isConsumable}
+                  />
+                  <span className="text-sm text-foreground">This is a consumable/replacement part</span>
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input 
+                    label="Spare Parts Storage Location" 
+                    name="partStorageLocation" 
+                    placeholder="e.g., Garage cabinet, Under sink" 
+                    defaultValue={selectedItem.consumableInfo?.replacementStorageLocation}
+                  />
+                  <Input 
+                    label="Stock Quantity" 
+                    name="stockQuantity" 
+                    type="number" 
+                    min="0"
+                    placeholder="How many spares?" 
+                    defaultValue={selectedItem.consumableInfo?.stockQuantity}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input 
+                    label="Replacement Interval (months)" 
+                    name="replacementInterval" 
+                    type="number" 
+                    min="1"
+                    placeholder="e.g., 6 for every 6 months" 
+                    defaultValue={selectedItem.consumableInfo?.replacementIntervalMonths}
+                  />
+                  <Input 
+                    label="Last Replaced" 
+                    name="lastReplaced" 
+                    type="date" 
+                    defaultValue={selectedItem.consumableInfo?.lastReplacedDate}
+                  />
+                </div>
+                <Input 
+                  label="Reorder URL (Optional)" 
+                  name="reorderUrl" 
+                  type="url"
+                  placeholder="https://amazon.com/..." 
+                  defaultValue={selectedItem.consumableInfo?.reorderUrl}
+                />
+                <Select
+                  label="Linked Appliance (Optional)"
+                  name="linkedApplianceId"
+                  value={selectedItem.consumableInfo?.linkedApplianceId || ''}
+                  options={[
+                    { value: '', label: 'Select appliance this part is for...' },
+                    ...getActiveItems()
+                      .filter(item => item.id !== selectedItem.id)
+                      .map(item => ({ 
+                        value: item.id, 
+                        label: `${item.name}${item.location ? ` (${item.location})` : ''}` 
+                      }))
+                  ]}
+                />
               </div>
             </div>
 

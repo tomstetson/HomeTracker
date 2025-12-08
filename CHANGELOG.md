@@ -2,6 +2,42 @@
 
 All notable changes to HomeTracker will be documented in this file.
 
+## [1.4.0] - 2024-12-08
+
+### 🚀 New Features
+
+#### Inventory Part Storage Location Tracking
+- **Consumable/Replacement Part Info** - Track items that need periodic replacement
+  - Mark items as consumables (filters, batteries, etc.)
+  - **Part Storage Location** - Log where spare parts are stored (e.g., "Garage cabinet", "Under sink")
+  - **Stock Quantity** - Track how many spares are on hand
+  - **Replacement Interval** - Set how often items need replacing (in months)
+  - **Last Replaced Date** - Record when item was last replaced
+  - **Next Replacement Date** - Auto-calculated based on interval
+  - **Reorder URL** - Link to purchase replacements
+  - **Linked Appliance** - Associate parts with parent appliances
+- **Visual Indicators** - Items show consumable badge and storage location on cards
+- **Low Stock Alerts** - Items with 0 stock show red warning badge
+
+#### Maintenance Task Linking
+- **Linked Inventory** - Connect maintenance tasks to inventory items
+- **Part Storage Hints** - Quick reference to where needed parts are stored
+- **Required Parts** - Track which inventory items are needed for tasks
+
+#### AI Continuity File
+- **CLAUDE.md** - New persistent context file for AI coding assistants
+  - Works with Claude Code, Cursor, Windsurf, and other AI platforms
+  - Documents implemented features, data models, and architecture
+  - Maintains TODO list for future features
+  - Key files reference and development tips
+
+### 🔧 Improvements
+- Enhanced inventory data model with `ConsumableInfo` interface
+- New store methods: `getConsumables`, `getConsumablesNeedingReplacement`, `recordPartReplacement`
+- Updated Add/Edit Item dialogs with consumable tracking section
+
+---
+
 ## [1.3.2] - 2024-12-08
 
 ### 🐛 Critical Bug Fix

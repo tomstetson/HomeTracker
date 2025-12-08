@@ -16,6 +16,11 @@ export interface MaintenanceTask {
   estimatedCost?: number;
   actualCost?: number;
   notes?: string;
+  
+  // Link to inventory items for part tracking
+  linkedInventoryId?: string;           // Primary appliance this task is for
+  requiredPartIds?: string[];           // Inventory IDs of parts needed for this task
+  partStorageHint?: string;             // Quick reference: "Spares in: Garage cabinet"
 }
 
 const DEFAULT_TASKS: MaintenanceTask[] = [

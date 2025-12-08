@@ -22,6 +22,19 @@ export interface SaleRecord {
   notes?: string;
 }
 
+// Consumable/replacement part info for items that need periodic replacement
+export interface ConsumableInfo {
+  isConsumable: boolean;                    // This is a consumable/replacement part
+  replacementStorageLocation?: string;      // Where spares are stored (e.g., "Garage cabinet", "Attic", "Under kitchen sink")
+  stockQuantity?: number;                   // How many spares on hand
+  reorderUrl?: string;                      // URL to reorder (Amazon, etc.)
+  reorderThreshold?: number;                // Alert when stock drops below this
+  linkedApplianceId?: string;               // ID of the appliance this part is for (e.g., filter for refrigerator)
+  replacementIntervalMonths?: number;       // How often to replace (e.g., 6 months for fridge filter)
+  lastReplacedDate?: string;                // When it was last replaced
+  nextReplacementDate?: string;             // Auto-calculated or manual next replacement
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -44,6 +57,9 @@ export interface InventoryItem {
   // Sale tracking
   status: 'active' | 'sold' | 'deleted';
   sale?: SaleRecord;
+  
+  // Consumable/replacement part tracking
+  consumableInfo?: ConsumableInfo;
   
   // Soft delete tracking
   deletedAt?: string; // ISO date when moved to trash
@@ -161,6 +177,13 @@ interface InventoryStore {
   // Stats
   getTotalValue: () => number;
   getTotalSaleRecoup: () => { totalPurchase: number; totalSale: number; profit: number };
+  
+  // Consumables/Parts
+  getConsumables: () => InventoryItem[];
+  getConsumablesNeedingReplacement: (daysAhead?: number) => InventoryItem[];
+  getConsumablesForAppliance: (applianceId: string) => InventoryItem[];
+  updateConsumableInfo: (id: string, consumableInfo: Partial<ConsumableInfo>) => void;
+  recordPartReplacement: (id: string) => void;
   
   // Storage
   loadFromStorage: () => void;
@@ -323,6 +346,90 @@ export const useInventoryStore = create<InventoryStore>((set, get) => ({
       totalSale,
       profit: totalSale - totalPurchase,
     };
+  },
+  
+  // Get all items marked as consumables
+  getConsumables: () => {
+    return get().items.filter(
+      (item) => item.status === 'active' && item.consumableInfo?.isConsumable
+    );
+  },
+  
+  // Get consumables that need replacement soon
+  getConsumablesNeedingReplacement: (daysAhead = 30) => {
+    const today = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(today.getDate() + daysAhead);
+    
+    return get().items.filter((item) => {
+      if (item.status !== 'active' || !item.consumableInfo?.isConsumable) return false;
+      if (!item.consumableInfo.nextReplacementDate) return false;
+      
+      const nextReplacement = new Date(item.consumableInfo.nextReplacementDate);
+      return nextReplacement <= futureDate;
+    });
+  },
+  
+  // Get all consumable parts linked to a specific appliance
+  getConsumablesForAppliance: (applianceId: string) => {
+    return get().items.filter(
+      (item) =>
+        item.status === 'active' &&
+        item.consumableInfo?.isConsumable &&
+        item.consumableInfo.linkedApplianceId === applianceId
+    );
+  },
+  
+  // Update consumable info for an item
+  updateConsumableInfo: (id, consumableInfo) => {
+    set((state) => ({
+      items: state.items.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              consumableInfo: {
+                ...item.consumableInfo,
+                ...consumableInfo,
+                isConsumable: consumableInfo.isConsumable ?? item.consumableInfo?.isConsumable ?? true,
+              },
+            }
+          : item
+      ),
+    }));
+    get().saveToStorage();
+  },
+  
+  // Record that a part was replaced (updates lastReplacedDate and calculates nextReplacementDate)
+  recordPartReplacement: (id) => {
+    const item = get().items.find((i) => i.id === id);
+    if (!item || !item.consumableInfo) return;
+    
+    const now = new Date().toISOString().split('T')[0];
+    const intervalMonths = item.consumableInfo.replacementIntervalMonths || 6;
+    const nextDate = new Date();
+    nextDate.setMonth(nextDate.getMonth() + intervalMonths);
+    
+    // Decrement stock if tracked
+    const newStock = item.consumableInfo.stockQuantity !== undefined
+      ? Math.max(0, item.consumableInfo.stockQuantity - 1)
+      : undefined;
+    
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.id === id
+          ? {
+              ...i,
+              consumableInfo: {
+                ...i.consumableInfo!,
+                lastReplacedDate: now,
+                nextReplacementDate: nextDate.toISOString().split('T')[0],
+                stockQuantity: newStock,
+              },
+            }
+          : i
+      ),
+    }));
+    get().saveToStorage();
   },
   
   loadFromStorage: () => {
