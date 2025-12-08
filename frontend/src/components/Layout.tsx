@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
+  PenTool,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
@@ -44,6 +45,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Maintenance', href: '/maintenance', icon: Wrench },
     { name: 'Vendors', href: '/vendors', icon: Users },
     { name: 'Documents', href: '/documents', icon: FileText },
+    { name: 'Diagrams', href: '/diagrams', icon: PenTool },
     { name: 'Home Info', href: '/home-info', icon: Building2 },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];

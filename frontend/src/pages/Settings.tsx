@@ -304,7 +304,7 @@ export default function Settings() {
             schedule maintenance, store documents, and never miss a warranty claim.
           </p>
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <span className="px-2 py-1 bg-muted/30 rounded">Version 1.2.1</span>
+            <span className="px-2 py-1 bg-muted/30 rounded">Version 1.3.0</span>
             <a 
               href="https://github.com/tomstetson/HomeTracker" 
               target="_blank" 

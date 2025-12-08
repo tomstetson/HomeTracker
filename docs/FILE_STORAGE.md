@@ -151,3 +151,5 @@ When using the cloud backup script, all files are included:
 2. Clear unused files periodically
 3. Consider NAS mount for larger storage needs
 
+
+

@@ -2,6 +2,29 @@
 
 All notable changes to HomeTracker will be documented in this file.
 
+## [1.3.0] - 2024-12-08
+
+### 🚀 New Features
+
+#### Diagrams Module
+- **Excalidraw Integration** - Full-featured diagramming tool powered by Excalidraw
+- **Multiple Diagram Types** - Network, Plumbing, Electrical, Floor Plan, HVAC, Yard/Landscape layouts
+- **Auto-Save** - Diagrams auto-save every 30 seconds with unsaved changes indicator
+- **Thumbnail Previews** - Visual previews generated for all saved diagrams
+- **Export to PNG** - Export any diagram as high-resolution PNG image
+- **Fullscreen Mode** - Distraction-free editing with fullscreen toggle
+- **Keyboard Shortcuts** - Ctrl+S to save, Escape to exit fullscreen
+- **Gallery & List Views** - Browse diagrams in grid or list format
+- **Category Filtering** - Filter diagrams by type
+- **Search** - Find diagrams by name or description
+
+### 🔧 Improvements
+- Added Diagrams to navigation sidebar
+- Added Diagrams to global search (Ctrl+K)
+- Integrated diagram storage with data persistence layer
+
+---
+
 ## [1.2.1] - 2024-12-03
 
 ### 🚀 New Features

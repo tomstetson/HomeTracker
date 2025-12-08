@@ -4,7 +4,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import {
   Search, X, FileText, FolderKanban, Package, Wrench, Users,
   Shield, Heart, Settings, Home, HardDrive, FileSpreadsheet,
-  ArrowRight, Command, CornerDownLeft
+  ArrowRight, Command, CornerDownLeft, PenTool
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -15,6 +15,7 @@ import { useVendorStore } from '../store/vendorStore';
 import { useWarrantyStore } from '../store/warrantyStore';
 import { useMaintenanceStore } from '../store/maintenanceStore';
 import { useDocumentStore } from '../store/documentStore';
+import { useDiagramStore } from '../store/diagramStore';
 
 interface SearchResult {
   id: string;
@@ -36,6 +37,7 @@ const PAGES: SearchResult[] = [
   { id: 'page-warranties', type: 'page', title: 'Warranties', subtitle: 'Track expirations', icon: <Shield className="w-4 h-4" />, href: '/warranties' },
   { id: 'page-vitals', type: 'page', title: 'Home Vitals', subtitle: 'Emergency info', icon: <Heart className="w-4 h-4" />, href: '/home-vitals' },
   { id: 'page-documents', type: 'page', title: 'Documents', subtitle: 'Files & receipts', icon: <FileText className="w-4 h-4" />, href: '/documents' },
+  { id: 'page-diagrams', type: 'page', title: 'Diagrams', subtitle: 'Visual layouts', icon: <PenTool className="w-4 h-4" />, href: '/diagrams' },
   { id: 'page-export', type: 'page', title: 'Data Export', subtitle: 'Excel view', icon: <FileSpreadsheet className="w-4 h-4" />, href: '/data' },
   { id: 'page-backup', type: 'page', title: 'Backup', subtitle: 'Storage & sync', icon: <HardDrive className="w-4 h-4" />, href: '/backup' },
   { id: 'page-settings', type: 'page', title: 'Settings', subtitle: 'Configuration', icon: <Settings className="w-4 h-4" />, href: '/settings' },
@@ -56,6 +58,7 @@ export function GlobalSearch() {
   const { warranties } = useWarrantyStore();
   const { tasks } = useMaintenanceStore();
   const { documents } = useDocumentStore();
+  const { diagrams } = useDiagramStore();
 
   // Keyboard shortcut to open
   useEffect(() => {
@@ -228,6 +231,26 @@ export function GlobalSearch() {
       }
     });
 
+    // Search diagrams
+    diagrams.forEach(diagram => {
+      const matches =
+        diagram.name.toLowerCase().includes(q) ||
+        diagram.description?.toLowerCase().includes(q) ||
+        diagram.category.toLowerCase().includes(q);
+
+      if (matches) {
+        allResults.push({
+          id: `diagram-${diagram.id}`,
+          type: 'document', // Using document type for icon handling
+          title: diagram.name,
+          subtitle: `Diagram • ${diagram.category.replace('-', ' ')}`,
+          icon: <PenTool className="w-4 h-4 text-indigo-500" />,
+          href: '/diagrams',
+          highlight: diagram.description?.substring(0, 60),
+        });
+      }
+    });
+
     // Sort: pages first, then by relevance (title match > subtitle match)
     allResults.sort((a, b) => {
       if (a.type === 'page' && b.type !== 'page') return -1;
@@ -244,7 +267,7 @@ export function GlobalSearch() {
 
     setResults(allResults.slice(0, 15)); // Limit to 15 results
     setSelectedIndex(0);
-  }, [projects, items, vendors, warranties, tasks, documents]);
+  }, [projects, items, vendors, warranties, tasks, documents, diagrams]);
 
   // Debounced search
   useEffect(() => {
