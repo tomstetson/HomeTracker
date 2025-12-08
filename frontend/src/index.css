@@ -246,3 +246,22 @@ html.dark {
     display: none !important;
   }
 }
+
+/* Excalidraw container styles */
+.excalidraw-container {
+  width: 100%;
+  height: 100%;
+}
+
+.excalidraw {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.excalidraw .App-menu_top {
+  background: white;
+}
+
+.dark .excalidraw .App-menu_top {
+  background: hsl(var(--card));
+}

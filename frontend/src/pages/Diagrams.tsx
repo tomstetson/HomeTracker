@@ -470,8 +470,11 @@ export default function Diagrams() {
         </div>
 
         {/* Excalidraw Canvas with Inventory Panel */}
-        <div className="flex-1 bg-white relative" style={{ minHeight: '500px' }}>
-          {initialData && (
+        <div 
+          className="flex-1 bg-white relative excalidraw-container" 
+          style={{ minHeight: '500px', height: 'calc(100vh - 200px)' }}
+        >
+          {initialData !== null ? (
             <Excalidraw
               excalidrawAPI={(api) => { excalidrawAPIRef.current = api; }}
               initialData={initialData}
@@ -484,6 +487,10 @@ export default function Diagrams() {
                 },
               }}
             />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>Loading diagram editor...</p>
+            </div>
           )}
           
           {/* Inventory Panel Overlay */}
@@ -496,6 +503,7 @@ export default function Diagrams() {
       </div>
     );
   }
+
 
   // Gallery View
   return (

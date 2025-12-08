@@ -2,6 +2,20 @@
 
 All notable changes to HomeTracker will be documented in this file.
 
+## [1.3.2] - 2024-12-08
+
+### 🐛 Critical Bug Fix
+
+#### Excalidraw Diagram Editor Fix
+- **Fixed blank canvas issue** - Excalidraw now renders correctly when opening diagrams
+  - Added explicit height/width styling to Excalidraw container
+  - Fixed CSS container sizing (`height: calc(100vh - 200px)`)
+  - Added `excalidraw-container` class for proper styling
+  - Added loading fallback message when initialData is not ready
+  - Fixed dark mode styling for Excalidraw toolbar
+
+---
+
 ## [1.3.1] - 2024-12-08
 
 ### 🚀 New Features
