@@ -247,21 +247,24 @@ html.dark {
   }
 }
 
-/* Excalidraw container styles */
-.excalidraw-container {
-  width: 100%;
-  height: 100%;
-}
-
-.excalidraw {
+/* Tldraw container styles */
+.tl-container {
   width: 100% !important;
   height: 100% !important;
 }
 
-.excalidraw .App-menu_top {
-  background: white;
+/* Make tldraw fill parent container */
+[data-tldraw] {
+  position: absolute !important;
+  inset: 0 !important;
 }
 
-.dark .excalidraw .App-menu_top {
-  background: hsl(var(--card));
+/* Dark mode support for tldraw */
+.dark .tl-background {
+  background: hsl(var(--background)) !important;
+}
+
+/* Hide tldraw branding in production */
+.tl-watermark {
+  display: none !important;
 }

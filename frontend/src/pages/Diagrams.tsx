@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Excalidraw, exportToBlob } from '@excalidraw/excalidraw';
+import { Tldraw, TldrawEditor, createTLStore, defaultShapeUtils, exportToBlob, TLRecord, Editor } from 'tldraw';
+import 'tldraw/tldraw.css';
 import { useDiagramStore, Diagram, DIAGRAM_CATEGORIES } from '../store/diagramStore';
-import { InventoryItem } from '../store/inventoryStore';
+import { InventoryItem, useInventoryStore } from '../store/inventoryStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
-import DiagramInventoryPanel from '../components/DiagramInventoryPanel';
 import {
   Plus,
   ArrowLeft,
@@ -21,11 +21,9 @@ import {
   Maximize2,
   X,
   Package,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-
-// Generate unique ID for Excalidraw elements
-const generateId = () => Math.random().toString(36).substring(2, 15);
 
 type ViewMode = 'gallery' | 'editor';
 
@@ -40,6 +38,7 @@ export default function Diagrams() {
     activeDiagramId,
     setActiveDiagram,
   } = useDiagramStore();
+  const { items: inventoryItems } = useInventoryStore();
   const toast = useToast();
 
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
@@ -53,20 +52,11 @@ export default function Diagrams() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
   const [isInventoryPanelOpen, setIsInventoryPanelOpen] = useState(false);
+  const [inventoryFilter, setInventoryFilter] = useState('');
+  const [inventoryCategory, setInventoryCategory] = useState('all');
 
-  // Excalidraw API reference for programmatic control
-  const excalidrawAPIRef = useRef<any>(null);
-
-  // Excalidraw refs - using refs to avoid infinite re-render loops
-  // Excalidraw manages its own internal state, we just need to track changes for saving
-  const excalidrawDataRef = useRef<{ elements: any[]; appState: any; files: any }>({
-    elements: [],
-    appState: {},
-    files: {},
-  });
-  
-  // Initial data for Excalidraw - only set when opening a diagram
-  const [initialData, setInitialData] = useState<{ elements: any[]; appState: any; files: any } | null>(null);
+  // Tldraw editor reference
+  const editorRef = useRef<Editor | null>(null);
 
   // Form state for new/edit diagram
   const [formName, setFormName] = useState('');
@@ -82,15 +72,25 @@ export default function Diagrams() {
     return matchesSearch && matchesCategory;
   });
 
+  // Filter inventory items for panel
+  const filteredInventory = inventoryItems.filter((item) => {
+    if (item.status !== 'active') return false;
+    const matchesSearch = item.name.toLowerCase().includes(inventoryFilter.toLowerCase());
+    const matchesCategory = inventoryCategory === 'all' || item.category === inventoryCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  // Get unique inventory categories
+  const inventoryCategories = Array.from(new Set(inventoryItems.filter(i => i.status === 'active').map((i) => i.category)));
+
   // Handle creating a new diagram
   const handleCreateDiagram = (e: React.FormEvent) => {
     e.preventDefault();
-    const newDiagramData = { elements: [], appState: {}, files: {} };
     const id = addDiagram({
       name: formName,
       description: formDescription,
       category: formCategory,
-      data: newDiagramData,
+      data: null, // Empty diagram
     });
     setIsNewDialogOpen(false);
     const savedFormName = formName;
@@ -98,9 +98,6 @@ export default function Diagrams() {
     setFormDescription('');
     setFormCategory('other');
     setActiveDiagram(id);
-    // Set initial data for the new diagram
-    excalidrawDataRef.current = newDiagramData;
-    setInitialData(newDiagramData);
     setHasUnsavedChanges(false);
     setViewMode('editor');
     toast.success('Diagram Created', `Created "${savedFormName}"`);
@@ -109,79 +106,51 @@ export default function Diagrams() {
   // Handle opening a diagram for editing
   const handleOpenDiagram = (diagram: Diagram) => {
     setActiveDiagram(diagram.id);
-    const data = diagram.data || { elements: [], appState: {}, files: {} };
-    excalidrawDataRef.current = {
-      elements: data.elements || [],
-      appState: data.appState || {},
-      files: data.files || {},
-    };
-    // Set initial data for Excalidraw component
-    setInitialData({
-      elements: data.elements || [],
-      appState: data.appState || {},
-      files: data.files || {},
-    });
     setHasUnsavedChanges(false);
     setViewMode('editor');
   };
 
   // Handle saving the current diagram
   const handleSaveDiagram = useCallback(async () => {
-    if (!activeDiagramId) return;
-
-    const { elements, appState, files } = excalidrawDataRef.current;
+    if (!activeDiagramId || !editorRef.current) return;
 
     try {
+      const editor = editorRef.current;
+      
+      // Get the document snapshot
+      const snapshot = editor.store.getSnapshot();
+      
       // Generate thumbnail
       let thumbnail: string | undefined;
-      if (elements.length > 0) {
-        try {
+      try {
+        const shapeIds = editor.getCurrentPageShapeIds();
+        if (shapeIds.size > 0) {
           const blob = await exportToBlob({
-            elements: elements,
-            appState: { ...appState, exportBackground: true },
-            files: files,
-            getDimensions: () => ({ width: 300, height: 200, scale: 1 }),
+            editor,
+            format: 'png',
+            ids: [...shapeIds],
           });
           thumbnail = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => resolve(reader.result as string);
             reader.readAsDataURL(blob);
           });
-        } catch (e) {
-          console.warn('Failed to generate thumbnail:', e);
         }
+      } catch (e) {
+        console.warn('Failed to generate thumbnail:', e);
       }
 
       updateDiagram(activeDiagramId, {
-        data: {
-          elements: elements,
-          appState: appState,
-          files: files,
-        },
+        data: snapshot,
         thumbnail,
       });
       setHasUnsavedChanges(false);
       toast.success('Saved', 'Diagram saved successfully');
     } catch (error) {
+      console.error('Save error:', error);
       toast.error('Error', 'Failed to save diagram');
     }
   }, [activeDiagramId, updateDiagram, toast]);
-
-  // Handle Excalidraw changes - store in ref to avoid re-render loops
-  const handleExcalidrawChange = useCallback((
-    elements: readonly any[],
-    appState: any,
-    files: any
-  ) => {
-    // Store data in ref (doesn't trigger re-render)
-    excalidrawDataRef.current = {
-      elements: [...elements],
-      appState: appState,
-      files: files,
-    };
-    // Only update hasUnsavedChanges state if it's not already true
-    setHasUnsavedChanges((prev) => prev || elements.length > 0);
-  }, []);
 
   // Handle back to gallery
   const handleBackToGallery = () => {
@@ -193,8 +162,7 @@ export default function Diagrams() {
     setViewMode('gallery');
     setActiveDiagram(null);
     setHasUnsavedChanges(false);
-    setInitialData(null); // Clear initial data so it's fresh when opening another diagram
-    excalidrawDataRef.current = { elements: [], appState: {}, files: {} };
+    editorRef.current = null;
   };
 
   // Handle edit diagram metadata
@@ -230,163 +198,68 @@ export default function Diagrams() {
 
   // Handle adding inventory item to diagram
   const handleAddInventoryItem = useCallback((item: InventoryItem) => {
-    if (!excalidrawAPIRef.current) {
+    if (!editorRef.current) {
       toast.info('Loading', 'Diagram editor is loading...');
       return;
     }
 
-    const api = excalidrawAPIRef.current;
-    const { width, height } = api.getAppState();
+    const editor = editorRef.current;
+    const { x, y } = editor.getViewportScreenCenter();
     
-    // Create a group of elements for the inventory item
-    const groupId = generateId();
-    const baseX = (width || 800) / 2 - 75;
-    const baseY = (height || 600) / 2 - 40;
-
-    // Create rectangle background
-    const rectElement = {
-      id: generateId(),
-      type: 'rectangle',
-      x: baseX,
-      y: baseY,
-      width: 150,
-      height: 80,
-      angle: 0,
-      strokeColor: '#1e88e5',
-      backgroundColor: '#e3f2fd',
-      fillStyle: 'solid',
-      strokeWidth: 2,
-      roughness: 0,
-      opacity: 100,
-      groupIds: [groupId],
-      seed: Math.floor(Math.random() * 100000),
-      version: 1,
-      versionNonce: Math.floor(Math.random() * 100000),
-      isDeleted: false,
-      boundElements: null,
-      link: null,
-      locked: false,
-      // Store inventory reference as custom data
-      customData: {
-        inventoryId: item.id,
-        inventoryName: item.name,
-        inventoryCategory: item.category,
+    // Create a text shape for the inventory item
+    editor.createShape({
+      type: 'text',
+      x: x - 75,
+      y: y - 20,
+      props: {
+        text: `📦 ${item.name}\n${item.brand || item.category}`,
+        size: 'm',
+        font: 'sans',
+        align: 'middle',
       },
-    };
-
-    // Create text label for item name
-    const textElement = {
-      id: generateId(),
-      type: 'text',
-      x: baseX + 10,
-      y: baseY + 15,
-      width: 130,
-      height: 25,
-      angle: 0,
-      strokeColor: '#1565c0',
-      backgroundColor: 'transparent',
-      fillStyle: 'solid',
-      strokeWidth: 1,
-      roughness: 0,
-      opacity: 100,
-      groupIds: [groupId],
-      seed: Math.floor(Math.random() * 100000),
-      version: 1,
-      versionNonce: Math.floor(Math.random() * 100000),
-      isDeleted: false,
-      boundElements: null,
-      link: null,
-      locked: false,
-      text: item.name,
-      fontSize: 14,
-      fontFamily: 1,
-      textAlign: 'center',
-      verticalAlign: 'middle',
-      baseline: 18,
-      containerId: null,
-      originalText: item.name,
-    };
-
-    // Create smaller text for category/brand
-    const subTextElement = {
-      id: generateId(),
-      type: 'text',
-      x: baseX + 10,
-      y: baseY + 45,
-      width: 130,
-      height: 20,
-      angle: 0,
-      strokeColor: '#64b5f6',
-      backgroundColor: 'transparent',
-      fillStyle: 'solid',
-      strokeWidth: 1,
-      roughness: 0,
-      opacity: 100,
-      groupIds: [groupId],
-      seed: Math.floor(Math.random() * 100000),
-      version: 1,
-      versionNonce: Math.floor(Math.random() * 100000),
-      isDeleted: false,
-      boundElements: null,
-      link: null,
-      locked: false,
-      text: item.brand || item.category,
-      fontSize: 11,
-      fontFamily: 1,
-      textAlign: 'center',
-      verticalAlign: 'middle',
-      baseline: 14,
-      containerId: null,
-      originalText: item.brand || item.category,
-    };
-
-    // Get current elements and add new ones
-    const currentElements = api.getSceneElements();
-    const newElements = [...currentElements, rectElement, textElement, subTextElement];
+    });
     
-    // Update the scene
-    api.updateScene({ elements: newElements });
-    
-    // Store in ref for saving
-    excalidrawDataRef.current.elements = newElements;
     setHasUnsavedChanges(true);
-    
     toast.success('Added', `"${item.name}" added to diagram`);
   }, [toast]);
 
   // Handle export
   const handleExport = async (diagram: Diagram) => {
-    if (!diagram.data || !diagram.data.elements) {
+    if (!diagram.data) {
       toast.error('Error', 'No diagram data to export');
       return;
     }
-    try {
-      const blob = await exportToBlob({
-        elements: diagram.data.elements,
-        appState: { ...diagram.data.appState, exportBackground: true },
-        files: diagram.data.files || {},
-        getDimensions: () => ({ width: 1920, height: 1080, scale: 2 }),
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Exported', 'Diagram exported as PNG');
-    } catch (error) {
-      toast.error('Error', 'Failed to export diagram');
+    
+    // If we're in editor mode with this diagram, export from editor
+    if (editorRef.current && activeDiagramId === diagram.id) {
+      try {
+        const editor = editorRef.current;
+        const shapeIds = editor.getCurrentPageShapeIds();
+        if (shapeIds.size === 0) {
+          toast.error('Error', 'No shapes to export');
+          return;
+        }
+        
+        const blob = await exportToBlob({
+          editor,
+          format: 'png',
+          ids: [...shapeIds],
+        });
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Exported', 'Diagram exported as PNG');
+      } catch (error) {
+        toast.error('Error', 'Failed to export diagram');
+      }
+    } else {
+      toast.info('Note', 'Open the diagram first to export it');
     }
   };
-
-  // Auto-save every 30 seconds
-  useEffect(() => {
-    if (!hasUnsavedChanges || !activeDiagramId) return;
-    const timer = setTimeout(() => {
-      handleSaveDiagram();
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, [hasUnsavedChanges, activeDiagramId, handleSaveDiagram]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -426,7 +299,7 @@ export default function Diagrams() {
         isFullscreen ? "fixed inset-0 z-50 bg-background" : "h-[calc(100vh-8rem)]"
       )}>
         {/* Editor Header */}
-        <div className="flex items-center justify-between p-3 bg-card border-b border-border">
+        <div className="flex items-center justify-between p-3 bg-card border-b border-border shrink-0">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={handleBackToGallery}>
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -469,36 +342,94 @@ export default function Diagrams() {
           </div>
         </div>
 
-        {/* Excalidraw Canvas with Inventory Panel */}
-        <div 
-          className="flex-1 bg-white relative excalidraw-container" 
-          style={{ minHeight: '500px', height: 'calc(100vh - 200px)' }}
-        >
-          {initialData !== null ? (
-            <Excalidraw
-              excalidrawAPI={(api) => { excalidrawAPIRef.current = api; }}
-              initialData={initialData}
-              onChange={handleExcalidrawChange}
-              UIOptions={{
-                canvasActions: {
-                  loadScene: false,
-                  export: false,
-                  saveToActiveFile: false,
-                },
+        {/* Editor Content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Tldraw Canvas */}
+          <div className="flex-1 relative">
+            <Tldraw
+              onMount={(editor) => {
+                editorRef.current = editor;
+                
+                // Load existing data if any
+                if (activeDiagram.data) {
+                  try {
+                    editor.store.loadSnapshot(activeDiagram.data);
+                  } catch (e) {
+                    console.warn('Failed to load diagram data:', e);
+                  }
+                }
+                
+                // Listen for changes
+                const unsubscribe = editor.store.listen(() => {
+                  setHasUnsavedChanges(true);
+                }, { scope: 'document' });
+                
+                return () => unsubscribe();
               }}
             />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              <p>Loading diagram editor...</p>
+          </div>
+          
+          {/* Inventory Panel */}
+          {isInventoryPanelOpen && (
+            <div className="w-72 bg-card border-l border-border flex flex-col shrink-0">
+              <div className="p-3 border-b border-border">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-foreground">Inventory Items</h3>
+                  <button 
+                    onClick={() => setIsInventoryPanelOpen(false)}
+                    className="p-1 hover:bg-muted rounded"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search items..."
+                  value={inventoryFilter}
+                  onChange={(e) => setInventoryFilter(e.target.value)}
+                  className="w-full px-2 py-1.5 text-sm bg-background border border-input rounded focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <select
+                  value={inventoryCategory}
+                  onChange={(e) => setInventoryCategory(e.target.value)}
+                  className="w-full mt-2 px-2 py-1.5 text-sm bg-background border border-input rounded focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Categories</option>
+                  {inventoryCategories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">
+                {filteredInventory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No items found
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {filteredInventory.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => handleAddInventoryItem(item)}
+                        className="w-full text-left p-2 rounded hover:bg-muted transition-colors group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{item.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {item.brand || item.category}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
-          
-          {/* Inventory Panel Overlay */}
-          <DiagramInventoryPanel
-            isOpen={isInventoryPanelOpen}
-            onClose={() => setIsInventoryPanelOpen(false)}
-            onAddItemToDiagram={handleAddInventoryItem}
-          />
         </div>
       </div>
     );
@@ -824,4 +755,3 @@ export default function Diagrams() {
     </div>
   );
 }
-

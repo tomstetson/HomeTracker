@@ -15,7 +15,7 @@
 - **Backend**: Node.js, Express.js, ExcelJS
 - **Storage**: JSON files + Excel export (hometracker.xlsx)
 - **Deployment**: Docker, Nginx, Supervisor
-- **Special Libraries**: Excalidraw (diagrams), Tesseract.js (OCR)
+- **Special Libraries**: tldraw (diagrams), Tesseract.js (OCR)
 
 ### Key Directories
 ```
