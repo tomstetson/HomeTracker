@@ -2,6 +2,28 @@
 
 All notable changes to HomeTracker will be documented in this file.
 
+## [1.3.1] - 2024-12-08
+
+### 🚀 New Features
+
+#### Diagrams Module - Inventory Integration
+- **Inventory Assets Panel** - Drop inventory items as sprites/assets onto diagrams
+  - Click "Inventory" button in diagram editor toolbar
+  - Browse inventory items by category (Kitchen Appliances, Laundry, HVAC, etc.)
+  - Search across all inventory items
+  - Drag & drop OR click to add items to diagrams
+  - Items create styled rectangles with name and brand/category labels
+  - Items store inventory reference (`customData`) for dynamic linking
+  - Categories can be expanded/collapsed
+  - Accessible buttons with proper ARIA labels
+
+### 🐛 Bug Fixes
+- Fixed infinite re-render loop when opening Excalidraw editor
+- Removed old Floor Plans module (consolidated into Diagrams)
+- Fixed accessibility for inventory item buttons in panel
+
+---
+
 ## [1.3.0] - 2024-12-08
 
 ### 🚀 New Features

@@ -35,7 +35,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { resolvedTheme, toggleTheme } = useTheme();
 
-  // Streamlined navigation - 8 core modules
+  // Streamlined navigation - 10 core modules
   // Home Info = Property details, value, paint colors, emergency info
   // Settings = App config, API settings, data backup
   const navigation = [
