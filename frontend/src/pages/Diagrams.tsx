@@ -1,13 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Tldraw, TldrawEditor, createTLStore, defaultShapeUtils, exportToBlob, TLRecord, Editor } from 'tldraw';
+import { Tldraw, Editor, exportToBlob } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { useDiagramStore, Diagram, DIAGRAM_CATEGORIES } from '../store/diagramStore';
-import { InventoryItem, useInventoryStore } from '../store/inventoryStore';
+import { useInventoryStore } from '../store/inventoryStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import {
+  DIAGRAM_SHAPES,
+  DIAGRAM_TEMPLATES,
+  SHAPE_CATEGORIES,
+  getShapesByCategory,
+  DiagramShape,
+  DiagramTemplate,
+} from '../lib/diagramShapes';
 import {
   Plus,
   ArrowLeft,
@@ -22,10 +30,14 @@ import {
   X,
   Package,
   ChevronRight,
+  Shapes,
+  FileText,
+  Layers,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 type ViewMode = 'gallery' | 'editor';
+type EditorPanel = 'shapes' | 'templates' | 'inventory' | null;
 
 export default function Diagrams() {
   const {
@@ -51,14 +63,17 @@ export default function Diagrams() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
-  const [isInventoryPanelOpen, setIsInventoryPanelOpen] = useState(false);
+  
+  // Editor state
+  const [activePanel, setActivePanel] = useState<EditorPanel>('shapes');
+  const [selectedShapeCategory, setSelectedShapeCategory] = useState('basic');
+  const [shapeSearchQuery, setShapeSearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState('');
-  const [inventoryCategory, setInventoryCategory] = useState('all');
 
   // Tldraw editor reference
   const editorRef = useRef<Editor | null>(null);
 
-  // Form state for new/edit diagram
+  // Form state
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formCategory, setFormCategory] = useState<Diagram['category']>('other');
@@ -72,16 +87,16 @@ export default function Diagrams() {
     return matchesSearch && matchesCategory;
   });
 
-  // Filter inventory items for panel
+  // Filter shapes
+  const filteredShapes = getShapesByCategory(selectedShapeCategory).filter(
+    (shape) => shape.name.toLowerCase().includes(shapeSearchQuery.toLowerCase())
+  );
+
+  // Filter inventory
   const filteredInventory = inventoryItems.filter((item) => {
     if (item.status !== 'active') return false;
-    const matchesSearch = item.name.toLowerCase().includes(inventoryFilter.toLowerCase());
-    const matchesCategory = inventoryCategory === 'all' || item.category === inventoryCategory;
-    return matchesSearch && matchesCategory;
+    return item.name.toLowerCase().includes(inventoryFilter.toLowerCase());
   });
-
-  // Get unique inventory categories
-  const inventoryCategories = Array.from(new Set(inventoryItems.filter(i => i.status === 'active').map((i) => i.category)));
 
   // Handle creating a new diagram
   const handleCreateDiagram = (e: React.FormEvent) => {
@@ -90,7 +105,7 @@ export default function Diagrams() {
       name: formName,
       description: formDescription,
       category: formCategory,
-      data: null, // Empty diagram
+      data: null,
     });
     setIsNewDialogOpen(false);
     const savedFormName = formName;
@@ -103,24 +118,92 @@ export default function Diagrams() {
     toast.success('Diagram Created', `Created "${savedFormName}"`);
   };
 
-  // Handle opening a diagram for editing
+  // Handle creating from template
+  const handleCreateFromTemplate = (template: DiagramTemplate) => {
+    const id = addDiagram({
+      name: template.name,
+      description: template.description,
+      category: template.category as Diagram['category'],
+      data: null,
+    });
+    setActiveDiagram(id);
+    setHasUnsavedChanges(false);
+    setViewMode('editor');
+    
+    // Apply template shapes after editor loads
+    setTimeout(() => {
+      if (editorRef.current) {
+        applyTemplate(template);
+      }
+    }, 500);
+    
+    toast.success('Template Applied', `Created "${template.name}"`);
+  };
+
+  // Apply template to canvas
+  const applyTemplate = (template: DiagramTemplate) => {
+    if (!editorRef.current) return;
+    const editor = editorRef.current;
+    
+    template.shapes.forEach((shape, index) => {
+      if (shape.type === 'rect') {
+        editor.createShape({
+          type: 'geo',
+          x: shape.x,
+          y: shape.y,
+          props: {
+            geo: 'rectangle',
+            w: shape.width || 100,
+            h: shape.height || 60,
+            text: shape.text || '',
+            fill: 'solid',
+            color: 'light-blue',
+          },
+        });
+      } else if (shape.type === 'text') {
+        editor.createShape({
+          type: 'text',
+          x: shape.x,
+          y: shape.y,
+          props: {
+            text: shape.text || '',
+            size: shape.props?.size || 'm',
+          },
+        });
+      } else if (shape.type === 'ellipse') {
+        editor.createShape({
+          type: 'geo',
+          x: shape.x,
+          y: shape.y,
+          props: {
+            geo: 'ellipse',
+            w: shape.width || 60,
+            h: shape.height || 60,
+            text: shape.text || '',
+            fill: 'solid',
+          },
+        });
+      }
+    });
+    
+    setHasUnsavedChanges(true);
+  };
+
+  // Handle opening a diagram
   const handleOpenDiagram = (diagram: Diagram) => {
     setActiveDiagram(diagram.id);
     setHasUnsavedChanges(false);
     setViewMode('editor');
   };
 
-  // Handle saving the current diagram
+  // Handle saving
   const handleSaveDiagram = useCallback(async () => {
     if (!activeDiagramId || !editorRef.current) return;
 
     try {
       const editor = editorRef.current;
-      
-      // Get the document snapshot
       const snapshot = editor.store.getSnapshot();
       
-      // Generate thumbnail
       let thumbnail: string | undefined;
       try {
         const shapeIds = editor.getCurrentPageShapeIds();
@@ -140,14 +223,10 @@ export default function Diagrams() {
         console.warn('Failed to generate thumbnail:', e);
       }
 
-      updateDiagram(activeDiagramId, {
-        data: snapshot,
-        thumbnail,
-      });
+      updateDiagram(activeDiagramId, { data: snapshot, thumbnail });
       setHasUnsavedChanges(false);
       toast.success('Saved', 'Diagram saved successfully');
     } catch (error) {
-      console.error('Save error:', error);
       toast.error('Error', 'Failed to save diagram');
     }
   }, [activeDiagramId, updateDiagram, toast]);
@@ -165,7 +244,57 @@ export default function Diagrams() {
     editorRef.current = null;
   };
 
-  // Handle edit diagram metadata
+  // Add shape to canvas
+  const handleAddShape = (shape: DiagramShape) => {
+    if (!editorRef.current) return;
+    const editor = editorRef.current;
+    const { x, y } = editor.getViewportScreenCenter();
+    
+    editor.createShape({
+      type: 'geo',
+      x: x - shape.width / 2,
+      y: y - shape.height / 2,
+      props: {
+        geo: 'rectangle',
+        w: shape.width,
+        h: shape.height,
+        text: `${shape.emoji} ${shape.name}`,
+        fill: 'solid',
+        color: 'light-blue',
+        size: 's',
+      },
+    });
+    
+    setHasUnsavedChanges(true);
+    toast.success('Added', `${shape.name} added to diagram`);
+  };
+
+  // Add inventory item to canvas
+  const handleAddInventoryItem = (item: any) => {
+    if (!editorRef.current) return;
+    const editor = editorRef.current;
+    const { x, y } = editor.getViewportScreenCenter();
+    
+    editor.createShape({
+      type: 'geo',
+      x: x - 75,
+      y: y - 40,
+      props: {
+        geo: 'rectangle',
+        w: 150,
+        h: 80,
+        text: `📦 ${item.name}\n${item.brand || item.category}`,
+        fill: 'solid',
+        color: 'light-blue',
+        size: 's',
+      },
+    });
+    
+    setHasUnsavedChanges(true);
+    toast.success('Added', `"${item.name}" added`);
+  };
+
+  // Handle edit metadata
   const handleEditMetadata = (diagram: Diagram) => {
     setSelectedDiagram(diagram);
     setFormName(diagram.name);
@@ -196,68 +325,29 @@ export default function Diagrams() {
     toast.success('Deleted', 'Diagram deleted');
   };
 
-  // Handle adding inventory item to diagram
-  const handleAddInventoryItem = useCallback((item: InventoryItem) => {
-    if (!editorRef.current) {
-      toast.info('Loading', 'Diagram editor is loading...');
-      return;
-    }
-
-    const editor = editorRef.current;
-    const { x, y } = editor.getViewportScreenCenter();
-    
-    // Create a text shape for the inventory item
-    editor.createShape({
-      type: 'text',
-      x: x - 75,
-      y: y - 20,
-      props: {
-        text: `📦 ${item.name}\n${item.brand || item.category}`,
-        size: 'm',
-        font: 'sans',
-        align: 'middle',
-      },
-    });
-    
-    setHasUnsavedChanges(true);
-    toast.success('Added', `"${item.name}" added to diagram`);
-  }, [toast]);
-
   // Handle export
   const handleExport = async (diagram: Diagram) => {
-    if (!diagram.data) {
-      toast.error('Error', 'No diagram data to export');
+    if (!editorRef.current || activeDiagramId !== diagram.id) {
+      toast.info('Note', 'Open the diagram first to export');
       return;
     }
-    
-    // If we're in editor mode with this diagram, export from editor
-    if (editorRef.current && activeDiagramId === diagram.id) {
-      try {
-        const editor = editorRef.current;
-        const shapeIds = editor.getCurrentPageShapeIds();
-        if (shapeIds.size === 0) {
-          toast.error('Error', 'No shapes to export');
-          return;
-        }
-        
-        const blob = await exportToBlob({
-          editor,
-          format: 'png',
-          ids: [...shapeIds],
-        });
-        
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.png`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success('Exported', 'Diagram exported as PNG');
-      } catch (error) {
-        toast.error('Error', 'Failed to export diagram');
+    try {
+      const editor = editorRef.current;
+      const shapeIds = editor.getCurrentPageShapeIds();
+      if (shapeIds.size === 0) {
+        toast.error('Error', 'No shapes to export');
+        return;
       }
-    } else {
-      toast.info('Note', 'Open the diagram first to export it');
+      const blob = await exportToBlob({ editor, format: 'png', ids: [...shapeIds] });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Exported', 'Diagram exported as PNG');
+    } catch (error) {
+      toast.error('Error', 'Failed to export');
     }
   };
 
@@ -299,41 +389,32 @@ export default function Diagrams() {
         isFullscreen ? "fixed inset-0 z-50 bg-background" : "h-[calc(100vh-8rem)]"
       )}>
         {/* Editor Header */}
-        <div className="flex items-center justify-between p-3 bg-card border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between p-2 bg-card border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={handleBackToGallery}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="w-4 h-4 mr-1" />
               Back
             </Button>
-            <div className="h-6 w-px bg-border" />
+            <div className="h-5 w-px bg-border" />
             <div>
-              <h2 className="font-semibold text-foreground">{activeDiagram.name}</h2>
-              <p className="text-xs text-muted-foreground">
+              <h2 className="font-semibold text-foreground text-sm">{activeDiagram.name}</h2>
+              <p className="text-[10px] text-muted-foreground">
                 {DIAGRAM_CATEGORIES.find(c => c.value === activeDiagram.category)?.label}
-                {hasUnsavedChanges && ' • Unsaved changes'}
+                {hasUnsavedChanges && ' • Unsaved'}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant={isInventoryPanelOpen ? "default" : "outline"} 
-              size="sm" 
-              onClick={() => setIsInventoryPanelOpen(!isInventoryPanelOpen)}
-              title="Add inventory items to diagram"
-            >
-              <Package className="w-4 h-4 mr-2" />
-              Inventory
-            </Button>
+          <div className="flex items-center gap-1">
             <Button variant="outline" size="sm" onClick={() => handleEditMetadata(activeDiagram)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Details
+              <Edit className="w-3 h-3 mr-1" />
+              Edit
             </Button>
             <Button variant="outline" size="sm" onClick={() => handleExport(activeDiagram)}>
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-3 h-3 mr-1" />
               Export
             </Button>
             <Button size="sm" onClick={handleSaveDiagram} disabled={!hasUnsavedChanges}>
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="w-3 h-3 mr-1" />
               Save
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(!isFullscreen)}>
@@ -342,110 +423,182 @@ export default function Diagrams() {
           </div>
         </div>
 
-        {/* Editor Content */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Tldraw Canvas */}
-          <div className="flex-1 relative">
-            <Tldraw
-              onMount={(editor) => {
-                editorRef.current = editor;
-                
-                // Load existing data if any
-                if (activeDiagram.data) {
-                  try {
-                    editor.store.loadSnapshot(activeDiagram.data);
-                  } catch (e) {
-                    console.warn('Failed to load diagram data:', e);
-                  }
-                }
-                
-                // Listen for changes
-                const unsubscribe = editor.store.listen(() => {
-                  setHasUnsavedChanges(true);
-                }, { scope: 'document' });
-                
-                return () => unsubscribe();
-              }}
-            />
+          {/* Left Toolbar */}
+          <div className="w-12 bg-card border-r border-border flex flex-col items-center py-2 gap-1 shrink-0">
+            <button
+              onClick={() => setActivePanel(activePanel === 'shapes' ? null : 'shapes')}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                activePanel === 'shapes' ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+              )}
+              title="Shapes"
+            >
+              <Shapes className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setActivePanel(activePanel === 'templates' ? null : 'templates')}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                activePanel === 'templates' ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+              )}
+              title="Templates"
+            >
+              <FileText className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setActivePanel(activePanel === 'inventory' ? null : 'inventory')}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                activePanel === 'inventory' ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+              )}
+              title="Inventory"
+            >
+              <Package className="w-5 h-5" />
+            </button>
           </div>
-          
-          {/* Inventory Panel */}
-          {isInventoryPanelOpen && (
-            <div className="w-72 bg-card border-l border-border flex flex-col shrink-0">
-              <div className="p-3 border-b border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-foreground">Inventory Items</h3>
-                  <button 
-                    onClick={() => setIsInventoryPanelOpen(false)}
-                    className="p-1 hover:bg-muted rounded"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search items..."
-                  value={inventoryFilter}
-                  onChange={(e) => setInventoryFilter(e.target.value)}
-                  className="w-full px-2 py-1.5 text-sm bg-background border border-input rounded focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-                <select
-                  value={inventoryCategory}
-                  onChange={(e) => setInventoryCategory(e.target.value)}
-                  className="w-full mt-2 px-2 py-1.5 text-sm bg-background border border-input rounded focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="all">All Categories</option>
-                  {inventoryCategories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex-1 overflow-y-auto p-2">
-                {filteredInventory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No items found
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    {filteredInventory.map((item) => (
+
+          {/* Left Panel */}
+          {activePanel && (
+            <div className="w-64 bg-card border-r border-border flex flex-col shrink-0 overflow-hidden">
+              {/* Shapes Panel */}
+              {activePanel === 'shapes' && (
+                <>
+                  <div className="p-2 border-b border-border">
+                    <h3 className="font-medium text-sm mb-2">Shapes</h3>
+                    <input
+                      type="text"
+                      placeholder="Search shapes..."
+                      value={shapeSearchQuery}
+                      onChange={(e) => setShapeSearchQuery(e.target.value)}
+                      className="w-full px-2 py-1 text-xs bg-background border border-input rounded"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1 p-2 border-b border-border">
+                    {SHAPE_CATEGORIES.map((cat) => (
                       <button
-                        key={item.id}
-                        onClick={() => handleAddInventoryItem(item)}
-                        className="w-full text-left p-2 rounded hover:bg-muted transition-colors group"
+                        key={cat.id}
+                        onClick={() => setSelectedShapeCategory(cat.id)}
+                        className={cn(
+                          "px-2 py-1 text-[10px] rounded transition-colors",
+                          selectedShapeCategory === cat.id
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted/50 hover:bg-muted"
+                        )}
+                      >
+                        {cat.icon}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2">
+                    <div className="grid grid-cols-2 gap-1">
+                      {filteredShapes.map((shape) => (
+                        <button
+                          key={shape.id}
+                          onClick={() => handleAddShape(shape)}
+                          className="p-2 text-center rounded border border-border hover:border-primary hover:bg-primary/5 transition-all"
+                        >
+                          <span className="text-xl block">{shape.emoji}</span>
+                          <span className="text-[10px] text-muted-foreground line-clamp-1">{shape.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Templates Panel */}
+              {activePanel === 'templates' && (
+                <>
+                  <div className="p-2 border-b border-border">
+                    <h3 className="font-medium text-sm">Templates</h3>
+                    <p className="text-[10px] text-muted-foreground">Click to apply</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {DIAGRAM_TEMPLATES.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => handleCreateFromTemplate(template)}
+                        className="w-full p-2 text-left rounded border border-border hover:border-primary hover:bg-primary/5 transition-all"
                       >
                         <div className="flex items-center gap-2">
-                          <Package className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium truncate">{item.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {item.brand || item.category}
-                            </p>
+                          <span className="text-2xl">{template.thumbnail}</span>
+                          <div>
+                            <p className="text-xs font-medium">{template.name}</p>
+                            <p className="text-[10px] text-muted-foreground line-clamp-1">{template.description}</p>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
                         </div>
                       </button>
                     ))}
                   </div>
-                )}
-              </div>
+                </>
+              )}
+
+              {/* Inventory Panel */}
+              {activePanel === 'inventory' && (
+                <>
+                  <div className="p-2 border-b border-border">
+                    <h3 className="font-medium text-sm mb-2">Inventory</h3>
+                    <input
+                      type="text"
+                      placeholder="Search items..."
+                      value={inventoryFilter}
+                      onChange={(e) => setInventoryFilter(e.target.value)}
+                      className="w-full px-2 py-1 text-xs bg-background border border-input rounded"
+                    />
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2">
+                    {filteredInventory.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">No items</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {filteredInventory.slice(0, 50).map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => handleAddInventoryItem(item)}
+                            className="w-full p-2 text-left rounded hover:bg-muted transition-colors"
+                          >
+                            <p className="text-xs font-medium truncate">📦 {item.name}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{item.category}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
+
+          {/* Canvas */}
+          <div className="flex-1 relative bg-white">
+            <Tldraw
+              onMount={(editor) => {
+                editorRef.current = editor;
+                if (activeDiagram.data) {
+                  try {
+                    editor.store.loadSnapshot(activeDiagram.data);
+                  } catch (e) {
+                    console.warn('Failed to load diagram:', e);
+                  }
+                }
+                editor.store.listen(() => setHasUnsavedChanges(true), { scope: 'document' });
+              }}
+            />
+          </div>
         </div>
       </div>
     );
   }
 
-
   // Gallery View
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Diagrams</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Create and manage home diagrams
-          </p>
+          <h1 className="text-2xl font-bold text-foreground">Diagrams</h1>
+          <p className="text-sm text-muted-foreground">Create and manage home diagrams</p>
         </div>
         <Button onClick={() => setIsNewDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
@@ -453,15 +606,27 @@ export default function Diagrams() {
         </Button>
       </div>
 
-      {/* Category Quick Filters */}
+      {/* Quick Templates */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        {DIAGRAM_TEMPLATES.slice(0, 8).map((template) => (
+          <button
+            key={template.id}
+            onClick={() => handleCreateFromTemplate(template)}
+            className="p-3 text-center rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all"
+          >
+            <span className="text-2xl block mb-1">{template.thumbnail}</span>
+            <span className="text-[10px] text-muted-foreground line-clamp-1">{template.name}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Category Filters */}
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setCategoryFilter('all')}
           className={cn(
             "px-3 py-1.5 rounded-full text-sm transition-all",
-            categoryFilter === 'all'
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+            categoryFilter === 'all' ? "bg-primary text-primary-foreground" : "bg-muted/30 hover:bg-muted/50"
           )}
         >
           All ({diagrams.length})
@@ -475,9 +640,7 @@ export default function Diagrams() {
               onClick={() => setCategoryFilter(cat.value)}
               className={cn(
                 "px-3 py-1.5 rounded-full text-sm transition-all",
-                categoryFilter === cat.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                categoryFilter === cat.value ? "bg-primary text-primary-foreground" : "bg-muted/30 hover:bg-muted/50"
               )}
             >
               {cat.icon} {cat.label} ({count})
@@ -486,7 +649,7 @@ export default function Diagrams() {
         })}
       </div>
 
-      {/* Search and View Toggle */}
+      {/* Search */}
       <div className="flex gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -495,40 +658,32 @@ export default function Diagrams() {
             placeholder="Search diagrams..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-foreground placeholder:text-muted-foreground"
+            className="w-full pl-9 pr-4 py-2 text-sm bg-background border border-input rounded-md focus:ring-2 focus:ring-ring"
           />
         </div>
         <div className="flex border border-input rounded-md overflow-hidden">
           <button
             onClick={() => setDisplayMode('grid')}
-            className={cn(
-              "px-3 py-2 transition-colors",
-              displayMode === 'grid' ? "bg-primary text-primary-foreground" : "hover:bg-muted/50"
-            )}
+            className={cn("px-3 py-2", displayMode === 'grid' ? "bg-primary text-primary-foreground" : "hover:bg-muted/50")}
           >
             <Grid3X3 className="w-4 h-4" />
           </button>
           <button
             onClick={() => setDisplayMode('list')}
-            className={cn(
-              "px-3 py-2 transition-colors",
-              displayMode === 'list' ? "bg-primary text-primary-foreground" : "hover:bg-muted/50"
-            )}
+            className={cn("px-3 py-2", displayMode === 'list' ? "bg-primary text-primary-foreground" : "hover:bg-muted/50")}
           >
             <List className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Diagrams Grid/List */}
+      {/* Diagrams */}
       {filteredDiagrams.length === 0 ? (
         <Card className="bg-card/50">
           <CardContent className="py-12 text-center">
-            <Grid3X3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="font-medium text-foreground mb-2">No diagrams yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create your first diagram to visualize your home systems
-            </p>
+            <Shapes className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="font-medium mb-2">No diagrams yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">Create your first diagram or use a template</p>
             <Button onClick={() => setIsNewDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Create Diagram
@@ -542,65 +697,35 @@ export default function Diagrams() {
             return (
               <Card
                 key={diagram.id}
-                className="group overflow-hidden hover:shadow-lg transition-all cursor-pointer bg-card/80 border-border/50"
+                className="group overflow-hidden hover:shadow-lg transition-all cursor-pointer"
                 onClick={() => handleOpenDiagram(diagram)}
               >
-                {/* Thumbnail */}
                 <div className="aspect-video bg-muted/20 relative overflow-hidden">
                   {diagram.thumbnail ? (
-                    <img
-                      src={diagram.thumbnail}
-                      alt={diagram.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={diagram.thumbnail} alt={diagram.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl">
-                      {category?.icon || '📋'}
-                    </div>
+                    <div className="w-full h-full flex items-center justify-center text-4xl">{category?.icon || '📋'}</div>
                   )}
-                  {/* Overlay Actions */}
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); handleOpenDiagram(diagram); }}>
-                      Open
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => { e.stopPropagation(); handleExport(diagram); }}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
+                    <Button size="sm" variant="secondary">Open</Button>
                   </div>
                 </div>
                 <CardContent className="p-3">
-                  <div className="flex items-start justify-between">
-                    <div className="min-w-0">
-                      <h3 className="font-medium text-foreground truncate">{diagram.name}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {category?.icon} {category?.label}
-                      </p>
-                    </div>
+                  <h3 className="font-medium truncate">{diagram.name}</h3>
+                  <p className="text-xs text-muted-foreground">{category?.icon} {category?.label}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(diagram.updatedAt).toLocaleDateString()}
+                    </span>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleEditMetadata(diagram); }}
-                        className="p-1 hover:bg-muted rounded"
-                      >
-                        <Edit className="w-4 h-4 text-muted-foreground" />
+                      <button onClick={(e) => { e.stopPropagation(); handleEditMetadata(diagram); }} className="p-1 hover:bg-muted rounded">
+                        <Edit className="w-3 h-3" />
                       </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedDiagram(diagram); setIsDeleteDialogOpen(true); }}
-                        className="p-1 hover:bg-destructive/20 rounded"
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                      <button onClick={(e) => { e.stopPropagation(); setSelectedDiagram(diagram); setIsDeleteDialogOpen(true); }} className="p-1 hover:bg-destructive/20 rounded">
+                        <Trash2 className="w-3 h-3 text-destructive" />
                       </button>
                     </div>
                   </div>
-                  {diagram.description && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{diagram.description}</p>
-                  )}
-                  <p className="text-[10px] text-muted-foreground mt-2">
-                    Updated {new Date(diagram.updatedAt).toLocaleDateString()}
-                  </p>
                 </CardContent>
               </Card>
             );
@@ -613,32 +738,19 @@ export default function Diagrams() {
             return (
               <div
                 key={diagram.id}
-                className="flex items-center gap-4 p-3 bg-card/80 rounded-lg border border-border/50 hover:bg-card transition-all cursor-pointer"
+                className="flex items-center gap-4 p-3 bg-card rounded-lg border hover:bg-card/80 cursor-pointer"
                 onClick={() => handleOpenDiagram(diagram)}
               >
-                <div className="w-16 h-12 bg-muted/20 rounded flex items-center justify-center text-2xl flex-shrink-0">
-                  {diagram.thumbnail ? (
-                    <img src={diagram.thumbnail} alt="" className="w-full h-full object-cover rounded" />
-                  ) : (
-                    category?.icon || '📋'
-                  )}
+                <div className="w-16 h-12 bg-muted/20 rounded flex items-center justify-center text-2xl">
+                  {diagram.thumbnail ? <img src={diagram.thumbnail} alt="" className="w-full h-full object-cover rounded" /> : category?.icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-foreground">{diagram.name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {category?.label} • Updated {new Date(diagram.updatedAt).toLocaleDateString()}
-                  </p>
+                  <h3 className="font-medium">{diagram.name}</h3>
+                  <p className="text-xs text-muted-foreground">{category?.label} • {new Date(diagram.updatedAt).toLocaleDateString()}</p>
                 </div>
                 <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleExport(diagram); }}>
-                    <Download className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEditMetadata(diagram); }}>
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedDiagram(diagram); setIsDeleteDialogOpen(true); }}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleEditMetadata(diagram); }}><Edit className="w-4 h-4" /></Button>
+                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedDiagram(diagram); setIsDeleteDialogOpen(true); }}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                 </div>
               </div>
             );
@@ -647,109 +759,51 @@ export default function Diagrams() {
       )}
 
       {/* New Diagram Dialog */}
-      <Dialog
-        open={isNewDialogOpen}
-        onClose={() => setIsNewDialogOpen(false)}
-        title="Create New Diagram"
-        description="Start with a blank canvas"
-        maxWidth="md"
-      >
+      <Dialog open={isNewDialogOpen} onClose={() => setIsNewDialogOpen(false)} title="Create New Diagram" maxWidth="md">
         <form onSubmit={handleCreateDiagram}>
           <div className="space-y-4">
-            <Input
-              label="Diagram Name"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              placeholder="e.g., Network Diagram"
-              required
-            />
+            <Input label="Diagram Name" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., Home Network" required />
             <Select
               label="Category"
               value={formCategory}
               onChange={(e) => setFormCategory(e.target.value as Diagram['category'])}
-              options={DIAGRAM_CATEGORIES.map((c) => ({
-                value: c.value,
-                label: `${c.icon} ${c.label}`,
-              }))}
+              options={DIAGRAM_CATEGORIES.map((c) => ({ value: c.value, label: `${c.icon} ${c.label}` }))}
             />
-            <Textarea
-              label="Description (optional)"
-              value={formDescription}
-              onChange={(e) => setFormDescription(e.target.value)}
-              placeholder="What does this diagram show?"
-              rows={2}
-            />
+            <Textarea label="Description" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="What does this diagram show?" rows={2} />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsNewDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!formName.trim()}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setIsNewDialogOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={!formName.trim()}><Plus className="w-4 h-4 mr-2" />Create</Button>
           </DialogFooter>
         </form>
       </Dialog>
 
-      {/* Edit Diagram Dialog */}
-      <Dialog
-        open={isEditDialogOpen}
-        onClose={() => { setIsEditDialogOpen(false); setSelectedDiagram(null); }}
-        title="Edit Diagram Details"
-        maxWidth="md"
-      >
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onClose={() => { setIsEditDialogOpen(false); setSelectedDiagram(null); }} title="Edit Diagram" maxWidth="md">
         <form onSubmit={handleUpdateMetadata}>
           <div className="space-y-4">
-            <Input
-              label="Diagram Name"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              required
-            />
+            <Input label="Diagram Name" value={formName} onChange={(e) => setFormName(e.target.value)} required />
             <Select
               label="Category"
               value={formCategory}
               onChange={(e) => setFormCategory(e.target.value as Diagram['category'])}
-              options={DIAGRAM_CATEGORIES.map((c) => ({
-                value: c.value,
-                label: `${c.icon} ${c.label}`,
-              }))}
+              options={DIAGRAM_CATEGORIES.map((c) => ({ value: c.value, label: `${c.icon} ${c.label}` }))}
             />
-            <Textarea
-              label="Description"
-              value={formDescription}
-              onChange={(e) => setFormDescription(e.target.value)}
-              rows={2}
-            />
+            <Textarea label="Description" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={2} />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedDiagram(null); }}>
-              Cancel
-            </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedDiagram(null); }}>Cancel</Button>
+            <Button type="submit">Save</Button>
           </DialogFooter>
         </form>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={isDeleteDialogOpen}
-        onClose={() => { setIsDeleteDialogOpen(false); setSelectedDiagram(null); }}
-        title="Delete Diagram?"
-        maxWidth="sm"
-      >
-        <p className="text-muted-foreground mb-4">
-          Are you sure you want to delete "{selectedDiagram?.name}"? This cannot be undone.
-        </p>
+      {/* Delete Dialog */}
+      <Dialog open={isDeleteDialogOpen} onClose={() => { setIsDeleteDialogOpen(false); setSelectedDiagram(null); }} title="Delete Diagram?" maxWidth="sm">
+        <p className="text-muted-foreground mb-4">Delete "{selectedDiagram?.name}"? This cannot be undone.</p>
         <DialogFooter>
-          <Button variant="outline" onClick={() => { setIsDeleteDialogOpen(false); setSelectedDiagram(null); }}>
-            Cancel
-          </Button>
-          <Button variant="destructive" onClick={handleDeleteDiagram}>
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete
-          </Button>
+          <Button variant="outline" onClick={() => { setIsDeleteDialogOpen(false); setSelectedDiagram(null); }}>Cancel</Button>
+          <Button variant="destructive" onClick={handleDeleteDiagram}><Trash2 className="w-4 h-4 mr-2" />Delete</Button>
         </DialogFooter>
       </Dialog>
     </div>
