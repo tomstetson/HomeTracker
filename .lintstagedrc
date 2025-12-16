@@ -1,9 +1,9 @@
 {
-  "*": "secretlint",
+  "*": "secretlint --secretlintrc .secretlintrc.json",
   "backend/**/*.{js,ts,json}": [
-    "cd backend && npm audit"
+    "npm audit --prefix backend"
   ],
   "frontend/**/*.{js,ts,json}": [
-    "cd frontend && npm audit"
+    "npm audit --prefix frontend"
   ]
 }
