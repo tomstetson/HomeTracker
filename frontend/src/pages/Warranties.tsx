@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import {
   Plus,
   Search,
@@ -36,6 +37,7 @@ export default function Warranties() {
   } = useWarrantyStore();
   
   const toast = useToast();
+  const confirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'active' | 'expiring' | 'expired'>('all');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -165,8 +167,16 @@ export default function Warranties() {
     toast.success('Warranty Updated', 'Successfully updated warranty');
   };
 
-  const handleDeleteWarranty = (id: string, itemName: string) => {
-    if (confirm(`Are you sure you want to delete the warranty for ${itemName}?`)) {
+  const handleDeleteWarranty = async (id: string, itemName: string) => {
+    const confirmed = await confirm({
+      title: 'Delete Warranty?',
+      message: `Are you sure you want to delete the warranty for "${itemName}"?`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       deleteWarranty(id);
       toast.success('Warranty Deleted', 'Successfully deleted warranty');
     }

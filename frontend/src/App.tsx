@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
 import Items from './pages/Items';
+import InventoryWizard from './pages/InventoryWizard';
 import Vendors from './pages/Vendors';
 import Maintenance from './pages/Maintenance';
 import Documents from './pages/Documents';
@@ -12,7 +13,10 @@ import Diagrams from './pages/Diagrams';
 import HomeInfo from './pages/HomeInfo';
 import Settings from './pages/Settings';
 import { ToastContainer, useToast } from './components/ui/Toast';
+import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { autoSync } from './lib/autoSync';
+import { initNotificationService } from './lib/notificationService';
+import { registerServiceWorker } from './lib/pwa';
 
 function AppContent() {
   const toast = useToast();
@@ -32,6 +36,14 @@ function AppContent() {
         }
       });
     }
+    
+    // Initialize notification service
+    initNotificationService();
+    
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      registerServiceWorker();
+    }
   }, [synced, toast]);
 
   return (
@@ -41,6 +53,7 @@ function AppContent() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/items" element={<Items />} />
+        <Route path="/inventory-wizard" element={<InventoryWizard />} />
         <Route path="/maintenance" element={<Maintenance />} />
         <Route path="/vendors" element={<Vendors />} />
         <Route path="/documents" element={<Documents />} />
@@ -56,8 +69,10 @@ function App() {
   return (
     <ThemeProvider>
       <Router>
-        <AppContent />
-        <ToastContainer />
+        <ConfirmProvider>
+          <AppContent />
+          <ToastContainer />
+        </ConfirmProvider>
       </Router>
     </ThemeProvider>
   );

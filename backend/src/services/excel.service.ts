@@ -713,6 +713,22 @@ class ExcelService {
     this.saveData();
   }
 
+  // Update a specific collection by name
+  updateCollection(collectionName: string, data: any): void {
+    const validCollections: (keyof HomeTrackerData)[] = [
+      'projects', 'items', 'vendors', 'warranties', 'maintenance', 
+      'documents', 'settings', 'customOptions', 'homeVitals',
+      'homeValues', 'paintColors', 'emergencyContacts'
+    ];
+    
+    if (validCollections.includes(collectionName as keyof HomeTrackerData)) {
+      (this.data as any)[collectionName] = data;
+      this.saveData();
+    } else {
+      console.warn(`Unknown collection: ${collectionName}`);
+    }
+  }
+
   // Force save (for shutdown)
   async forceSave(): Promise<void> {
     if (this.saveTimeout) {

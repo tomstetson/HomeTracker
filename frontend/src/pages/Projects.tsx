@@ -7,6 +7,7 @@ import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { TagInput, PROJECT_TAG_SUGGESTIONS } from '../components/ui/TagInput';
 import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import { 
   Plus, GripVertical, Calendar, DollarSign, Tag, Edit, Trash2, 
   ChevronDown, ChevronRight, LayoutGrid, List, Filter,
@@ -24,6 +25,7 @@ export default function Projects() {
   } = useProjectStore();
   const { vendors } = useVendorStore();
   const toast = useToast();
+  const confirm = useConfirm();
   const [draggedProject, setDraggedProject] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -188,8 +190,16 @@ export default function Projects() {
     toast.success('Project Updated', `Successfully updated "${updates.name}"`);
   };
 
-  const handleDeleteProject = (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete "${name}"?`)) {
+  const handleDeleteProject = async (id: string, name: string) => {
+    const confirmed = await confirm({
+      title: 'Delete Project?',
+      message: `Are you sure you want to delete "${name}"? This will also delete all subtasks.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       deleteProject(id);
       toast.success('Project Deleted', `Removed "${name}"`);
     }

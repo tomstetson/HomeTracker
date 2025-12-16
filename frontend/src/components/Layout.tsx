@@ -23,6 +23,7 @@ import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
 import DataManager from './DataManager';
 import GlobalSearch from './GlobalSearch';
+import NotificationPanel from './NotificationPanel';
 
 interface LayoutProps {
   children: ReactNode;
@@ -32,8 +33,17 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isDataManagerOpen, setIsDataManagerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
   const { resolvedTheme, toggleTheme } = useTheme();
+  
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+    // Auto-collapse sidebar on mobile
+    if (isMobileDevice()) {
+      setSidebarCollapsed(true);
+    }
+  }, []);
 
   // Streamlined navigation - 10 core modules
   // Home Info = Property details, value, paint colors, emergency info
@@ -289,10 +299,7 @@ export default function Layout({ children }: LayoutProps) {
               </button>
 
               {/* Notifications */}
-              <button className="relative text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              <NotificationPanel />
             </div>
           </div>
         </header>

@@ -27,6 +27,10 @@ import {
   Edit,
 } from 'lucide-react';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
+import { generateMaintenanceRecommendations, predictMaintenanceIssues, optimizeMaintenanceSchedule, MaintenanceRecommendation, PredictiveMaintenance } from '../lib/maintenanceAutomation';
+import { useAISettingsStore } from '../store/aiSettingsStore';
+import { isAIReady } from '../lib/aiService';
+import { Sparkles, Brain, TrendingUp, Loader2, AlertCircle, CheckCircle, Calendar, DollarSign } from 'lucide-react';
 
 type ViewMode = 'tasks' | 'history';
 type DisplayMode = 'list' | 'card';
@@ -53,6 +57,17 @@ export default function Maintenance() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [taskFilter, setTaskFilter] = useState<TaskFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  
+  // AI Recommendations state
+  const [aiRecommendations, setAiRecommendations] = useState<MaintenanceRecommendation[]>([]);
+  const [predictions, setPredictions] = useState<PredictiveMaintenance[]>([]);
+  const [scheduleSuggestions, setScheduleSuggestions] = useState<any[]>([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [showAIRecommendations, setShowAIRecommendations] = useState(false);
+  
+  const { isFeatureEnabled } = useAISettingsStore();
+  const aiReady = isAIReady();
+  const maintenanceAutomationEnabled = isFeatureEnabled('enableMaintenanceAutomation') && aiReady.ready;
 
   useEffect(() => {
     loadFromStorage();
@@ -298,6 +313,66 @@ export default function Maintenance() {
         setViewMode('tasks');
       }
     }
+  };
+  
+  // Load AI recommendations
+  const loadAIRecommendations = async () => {
+    if (!maintenanceAutomationEnabled) return;
+    
+    setIsLoadingRecommendations(true);
+    try {
+      const [recsResult, predsResult, scheduleResult] = await Promise.all([
+        generateMaintenanceRecommendations(),
+        predictMaintenanceIssues(),
+        optimizeMaintenanceSchedule(),
+      ]);
+      
+      if (recsResult.success) {
+        setAiRecommendations(recsResult.recommendations);
+      }
+      if (predsResult.success) {
+        setPredictions(predsResult.predictions);
+      }
+      if (scheduleResult.success) {
+        setScheduleSuggestions(scheduleResult.suggestions);
+      }
+      
+      setShowAIRecommendations(true);
+    } catch (error: any) {
+      toast.error('Failed to load recommendations', error.message);
+    } finally {
+      setIsLoadingRecommendations(false);
+    }
+  };
+  
+  // Create task from recommendation
+  const createTaskFromRecommendation = (rec: MaintenanceRecommendation) => {
+    const dueDate = new Date();
+    // Set due date based on frequency
+    if (rec.suggestedFrequency === 'weekly') {
+      dueDate.setDate(dueDate.getDate() + 7);
+    } else if (rec.suggestedFrequency === 'monthly') {
+      dueDate.setMonth(dueDate.getMonth() + 1);
+    } else if (rec.suggestedFrequency === 'quarterly') {
+      dueDate.setMonth(dueDate.getMonth() + 3);
+    } else if (rec.suggestedFrequency === 'yearly') {
+      dueDate.setFullYear(dueDate.getFullYear() + 1);
+    } else {
+      dueDate.setDate(dueDate.getDate() + 7); // Default to 1 week
+    }
+    
+    addTask({
+      title: rec.title,
+      description: rec.description,
+      category: rec.category,
+      priority: rec.priority,
+      dueDate: dueDate.toISOString().split('T')[0],
+      recurrence: rec.suggestedFrequency !== 'none' ? rec.suggestedFrequency : undefined,
+      estimatedCost: rec.estimatedCost,
+      notes: rec.reasoning,
+    });
+    
+    toast.success('Task Created', `Added "${rec.title}" to your maintenance schedule`);
   };
 
   const priorityDots = {
@@ -637,6 +712,156 @@ export default function Maintenance() {
           </div>
         </div>
       </div>
+
+      {/* AI Recommendations */}
+      {maintenanceAutomationEnabled && (
+        <Card className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-purple-500/20">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-500" />
+                <h2 className="text-lg font-semibold text-foreground">AI Maintenance Recommendations</h2>
+              </div>
+              {!showAIRecommendations && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadAIRecommendations}
+                  disabled={isLoadingRecommendations}
+                >
+                  {isLoadingRecommendations ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="w-4 h-4 mr-2" />
+                      Get Recommendations
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+            
+            {showAIRecommendations && (
+              <div className="space-y-4">
+                {/* Recommendations */}
+                {aiRecommendations.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      Suggested Tasks ({aiRecommendations.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {aiRecommendations.slice(0, 5).map((rec, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 bg-card/50 rounded-lg border border-border/50 hover:border-purple-500/50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium text-foreground">{rec.title}</h4>
+                                <span className={cn(
+                                  "px-2 py-0.5 rounded text-xs font-medium",
+                                  priorityBadges[rec.priority]
+                                )}>
+                                  {rec.priority}
+                                </span>
+                                {rec.suggestedFrequency !== 'none' && (
+                                  <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">
+                                    {rec.suggestedFrequency}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
+                              <p className="text-xs text-muted-foreground italic">{rec.reasoning}</p>
+                              {rec.estimatedCost && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Estimated cost: {formatCurrency(rec.estimatedCost)}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => createTaskFromRecommendation(rec)}
+                            >
+                              <Plus className="w-4 h-4 mr-1" />
+                              Add
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Predictions */}
+                {predictions.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-orange-500" />
+                      Predictive Maintenance ({predictions.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {predictions.slice(0, 3).map((pred, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 bg-card/50 rounded-lg border border-orange-500/20"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-foreground">{pred.itemName}</h4>
+                              <p className="text-sm text-muted-foreground mt-1">{pred.predictedIssue}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Predicted date: {formatDate(pred.predictedDate)} • Confidence: {Math.round(pred.confidence * 100)}%
+                              </p>
+                              <p className="text-xs text-muted-foreground italic mt-1">{pred.recommendedAction}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Schedule Optimization */}
+                {scheduleSuggestions.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-blue-500" />
+                      Schedule Optimization ({scheduleSuggestions.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {scheduleSuggestions.slice(0, 3).map((suggestion, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 bg-card/50 rounded-lg border border-blue-500/20"
+                        >
+                          <p className="text-sm text-foreground mb-1">{suggestion.reasoning}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Suggested date: {formatDate(suggestion.suggestedDate)}
+                            {suggestion.estimatedSavings && (
+                              <> • Potential savings: {formatCurrency(suggestion.estimatedSavings)}</>
+                            )}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {aiRecommendations.length === 0 && predictions.length === 0 && scheduleSuggestions.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No recommendations at this time. All maintenance is up to date!
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats - Filter buttons */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">

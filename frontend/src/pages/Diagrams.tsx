@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Tldraw, Editor, exportToBlob } from 'tldraw';
 import 'tldraw/tldraw.css';
+import mermaid from 'mermaid';
 import { useDiagramStore, Diagram, DIAGRAM_CATEGORIES } from '../store/diagramStore';
 import { useInventoryStore } from '../store/inventoryStore';
+import { useAISettingsStore } from '../store/aiSettingsStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
+import { MermaidAIAssistant } from '../components/MermaidAIAssistant';
 import {
   DIAGRAM_SHAPES,
   DIAGRAM_TEMPLATES,
@@ -33,11 +37,104 @@ import {
   Shapes,
   FileText,
   Layers,
+  ZoomIn,
+  ZoomOut,
+  Minimize2,
+  Grid,
+  Keyboard,
+  Code,
+  Image,
+  FileCode,
+  RotateCcw,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-type ViewMode = 'gallery' | 'editor';
+type ViewMode = 'gallery' | 'editor' | 'mermaid-editor';
 type EditorPanel = 'shapes' | 'templates' | 'inventory' | null;
+
+// Initialize mermaid
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'default',
+  securityLevel: 'loose',
+  flowchart: {
+    useMaxWidth: true,
+    htmlLabels: true,
+    curve: 'basis',
+  },
+});
+
+// Default Mermaid examples for each diagram type
+const MERMAID_EXAMPLES: Record<string, string> = {
+  network: `graph TD
+    Internet[☁️ Internet]
+    Router[📡 Router]
+    Switch[🔀 Switch]
+    PC1[💻 Desktop]
+    PC2[💻 Laptop]
+    TV[📺 Smart TV]
+    
+    Internet --> Router
+    Router --> Switch
+    Switch --> PC1
+    Switch --> PC2
+    Switch --> TV`,
+  flowchart: `flowchart LR
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Process 1]
+    B -->|No| D[Process 2]
+    C --> E[End]
+    D --> E`,
+  sequence: `sequenceDiagram
+    participant User
+    participant System
+    participant Database
+    
+    User->>System: Request Data
+    System->>Database: Query
+    Database-->>System: Results
+    System-->>User: Display Data`,
+  electrical: `graph TD
+    Panel[⚡ Main Panel 200A]
+    Kitchen[🍳 Kitchen 20A]
+    Living[🛋️ Living Room 15A]
+    Bedroom[🛏️ Bedroom 15A]
+    HVAC[❄️ HVAC 30A]
+    
+    Panel --> Kitchen
+    Panel --> Living
+    Panel --> Bedroom
+    Panel --> HVAC`,
+  plumbing: `graph TD
+    Main[💧 Water Main]
+    Heater[🔥 Water Heater]
+    Kitchen[🍳 Kitchen]
+    Bath1[🚿 Bathroom 1]
+    Bath2[🚿 Bathroom 2]
+    
+    Main --> Heater
+    Main --> Kitchen
+    Heater --> Bath1
+    Heater --> Bath2`,
+  other: `graph TD
+    A[Box A] --> B[Box B]
+    B --> C[Box C]
+    C --> D[Box D]`,
+};
+
+// Keyboard shortcuts
+const KEYBOARD_SHORTCUTS = [
+  { key: 'Ctrl + S', action: 'Save diagram' },
+  { key: 'Ctrl + Z', action: 'Undo' },
+  { key: 'Ctrl + Y', action: 'Redo' },
+  { key: 'Ctrl + +', action: 'Zoom in' },
+  { key: 'Ctrl + -', action: 'Zoom out' },
+  { key: 'Ctrl + 0', action: 'Reset zoom' },
+  { key: 'Escape', action: 'Exit fullscreen' },
+  { key: 'Delete', action: 'Delete selected' },
+  { key: 'Ctrl + A', action: 'Select all' },
+  { key: 'Ctrl + D', action: 'Duplicate selected' },
+];
 
 export default function Diagrams() {
   const {
@@ -52,23 +149,33 @@ export default function Diagrams() {
   } = useDiagramStore();
   const { items: inventoryItems } = useInventoryStore();
   const toast = useToast();
+  const confirmDialog = useConfirm();
 
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isKeyboardDialogOpen, setIsKeyboardDialogOpen] = useState(false);
   const [selectedDiagram, setSelectedDiagram] = useState<Diagram | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
+  const [showGrid, setShowGrid] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(100);
   
   // Editor state
   const [activePanel, setActivePanel] = useState<EditorPanel>('shapes');
   const [selectedShapeCategory, setSelectedShapeCategory] = useState('basic');
   const [shapeSearchQuery, setShapeSearchQuery] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState('');
+
+  // Mermaid state
+  const [mermaidCode, setMermaidCode] = useState('');
+  const [mermaidSvg, setMermaidSvg] = useState('');
+  const [mermaidError, setMermaidError] = useState<string | null>(null);
+  const mermaidContainerRef = useRef<HTMLDivElement>(null);
 
   // Tldraw editor reference
   const editorRef = useRef<Editor | null>(null);
@@ -77,6 +184,7 @@ export default function Diagrams() {
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formCategory, setFormCategory] = useState<Diagram['category']>('other');
+  const [formType, setFormType] = useState<'tldraw' | 'mermaid'>('tldraw');
 
   // Filter diagrams
   const filteredDiagrams = diagrams.filter((d) => {
@@ -98,23 +206,69 @@ export default function Diagrams() {
     return item.name.toLowerCase().includes(inventoryFilter.toLowerCase());
   });
 
+  // Render mermaid diagram
+  const renderMermaid = useCallback(async (code: string) => {
+    if (!code.trim()) {
+      setMermaidSvg('');
+      setMermaidError(null);
+      return;
+    }
+
+    try {
+      const id = `mermaid-${Date.now()}`;
+      const { svg } = await mermaid.render(id, code);
+      setMermaidSvg(svg);
+      setMermaidError(null);
+    } catch (error: any) {
+      setMermaidError(error.message || 'Invalid Mermaid syntax');
+      setMermaidSvg('');
+    }
+  }, []);
+
+  // Debounced mermaid render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (viewMode === 'mermaid-editor') {
+        renderMermaid(mermaidCode);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [mermaidCode, viewMode, renderMermaid]);
+
   // Handle creating a new diagram
   const handleCreateDiagram = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = addDiagram({
+    
+    const diagramData: any = {
       name: formName,
       description: formDescription,
       category: formCategory,
       data: null,
-    });
+    };
+
+    if (formType === 'mermaid') {
+      // Initialize with mermaid template
+      const template = MERMAID_EXAMPLES[formCategory] || MERMAID_EXAMPLES.other;
+      diagramData.data = { type: 'mermaid', code: template };
+    }
+
+    const id = addDiagram(diagramData);
     setIsNewDialogOpen(false);
     const savedFormName = formName;
     setFormName('');
     setFormDescription('');
     setFormCategory('other');
+    setFormType('tldraw');
     setActiveDiagram(id);
     setHasUnsavedChanges(false);
-    setViewMode('editor');
+    
+    if (formType === 'mermaid') {
+      setMermaidCode(diagramData.data.code);
+      setViewMode('mermaid-editor');
+    } else {
+      setViewMode('editor');
+    }
+    
     toast.success('Diagram Created', `Created "${savedFormName}"`);
   };
 
@@ -193,12 +347,91 @@ export default function Diagrams() {
   const handleOpenDiagram = (diagram: Diagram) => {
     setActiveDiagram(diagram.id);
     setHasUnsavedChanges(false);
-    setViewMode('editor');
+    
+    // Check if it's a mermaid diagram
+    if (diagram.data?.type === 'mermaid') {
+      setMermaidCode(diagram.data.code || '');
+      setViewMode('mermaid-editor');
+    } else {
+      setViewMode('editor');
+    }
   };
+
+  // Zoom functions for tldraw
+  const handleZoomIn = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.zoomIn();
+      setZoomLevel(Math.round(editorRef.current.getZoomLevel() * 100));
+    }
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.zoomOut();
+      setZoomLevel(Math.round(editorRef.current.getZoomLevel() * 100));
+    }
+  }, []);
+
+  const handleZoomToFit = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.zoomToFit();
+      setZoomLevel(Math.round(editorRef.current.getZoomLevel() * 100));
+    }
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.resetZoom();
+      setZoomLevel(100);
+    }
+  }, []);
 
   // Handle saving
   const handleSaveDiagram = useCallback(async () => {
-    if (!activeDiagramId || !editorRef.current) return;
+    if (!activeDiagramId) return;
+
+    // Handle mermaid diagram save
+    if (viewMode === 'mermaid-editor') {
+      let thumbnail: string | undefined;
+      
+      // Generate thumbnail from SVG
+      if (mermaidSvg && mermaidContainerRef.current) {
+        try {
+          const svgElement = mermaidContainerRef.current.querySelector('svg');
+          if (svgElement) {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new window.Image();
+            
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => {
+                canvas.width = Math.min(img.width, 400);
+                canvas.height = Math.min(img.height, 300);
+                ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                thumbnail = canvas.toDataURL('image/png');
+                resolve();
+              };
+              img.onerror = reject;
+              img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to generate mermaid thumbnail:', e);
+        }
+      }
+
+      updateDiagram(activeDiagramId, { 
+        data: { type: 'mermaid', code: mermaidCode },
+        thumbnail 
+      });
+      setHasUnsavedChanges(false);
+      toast.success('Saved', 'Mermaid diagram saved successfully');
+      return;
+    }
+
+    // Handle tldraw diagram save
+    if (!editorRef.current) return;
 
     try {
       const editor = editorRef.current;
@@ -229,12 +462,19 @@ export default function Diagrams() {
     } catch (error) {
       toast.error('Error', 'Failed to save diagram');
     }
-  }, [activeDiagramId, updateDiagram, toast]);
+  }, [activeDiagramId, updateDiagram, toast, viewMode, mermaidCode, mermaidSvg]);
 
   // Handle back to gallery
-  const handleBackToGallery = () => {
+  const handleBackToGallery = async () => {
     if (hasUnsavedChanges) {
-      if (!confirm('You have unsaved changes. Are you sure you want to leave?')) {
+      const confirmed = await confirmDialog({
+        title: 'Unsaved Changes',
+        message: 'You have unsaved changes. Are you sure you want to leave without saving?',
+        confirmText: 'Leave',
+        cancelText: 'Stay',
+        variant: 'warning',
+      });
+      if (!confirmed) {
         return;
       }
     }
@@ -242,6 +482,9 @@ export default function Diagrams() {
     setActiveDiagram(null);
     setHasUnsavedChanges(false);
     editorRef.current = null;
+    setMermaidCode('');
+    setMermaidSvg('');
+    setMermaidError(null);
   };
 
   // Add shape to canvas
@@ -326,11 +569,72 @@ export default function Diagrams() {
   };
 
   // Handle export
-  const handleExport = async (diagram: Diagram) => {
-    if (!editorRef.current || activeDiagramId !== diagram.id) {
+  const handleExport = async (format: 'png' | 'svg' = 'png') => {
+    const diagram = activeDiagramId ? getDiagram(activeDiagramId) : null;
+    if (!diagram) return;
+
+    // Export mermaid diagram
+    if (viewMode === 'mermaid-editor') {
+      if (!mermaidSvg) {
+        toast.error('Error', 'No diagram to export');
+        return;
+      }
+
+      if (format === 'svg') {
+        const blob = new Blob([mermaidSvg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.svg`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Exported', 'Diagram exported as SVG');
+      } else {
+        // Convert SVG to PNG
+        try {
+          const svgElement = mermaidContainerRef.current?.querySelector('svg');
+          if (!svgElement) throw new Error('No SVG found');
+
+          const svgData = new XMLSerializer().serializeToString(svgElement);
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const img = new window.Image();
+
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => {
+              canvas.width = img.width * 2;
+              canvas.height = img.height * 2;
+              ctx?.scale(2, 2);
+              ctx?.drawImage(img, 0, 0);
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('Exported', 'Diagram exported as PNG');
+                }
+                resolve();
+              }, 'image/png');
+            };
+            img.onerror = reject;
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+          });
+        } catch (error) {
+          toast.error('Error', 'Failed to export as PNG');
+        }
+      }
+      return;
+    }
+
+    // Export tldraw diagram
+    if (!editorRef.current) {
       toast.info('Note', 'Open the diagram first to export');
       return;
     }
+
     try {
       const editor = editorRef.current;
       const shapeIds = editor.getCurrentPageShapeIds();
@@ -338,14 +642,26 @@ export default function Diagrams() {
         toast.error('Error', 'No shapes to export');
         return;
       }
-      const blob = await exportToBlob({ editor, format: 'png', ids: [...shapeIds] });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success('Exported', 'Diagram exported as PNG');
+
+      if (format === 'svg') {
+        const blob = await exportToBlob({ editor, format: 'svg', ids: [...shapeIds] });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.svg`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Exported', 'Diagram exported as SVG');
+      } else {
+        const blob = await exportToBlob({ editor, format: 'png', ids: [...shapeIds] });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${diagram.name.replace(/\s+/g, '-').toLowerCase()}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Exported', 'Diagram exported as PNG');
+      }
     } catch (error) {
       toast.error('Error', 'Failed to export');
     }
@@ -354,17 +670,49 @@ export default function Diagrams() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's' && viewMode === 'editor') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's' && (viewMode === 'editor' || viewMode === 'mermaid-editor')) {
         e.preventDefault();
         handleSaveDiagram();
       }
       if (e.key === 'Escape' && isFullscreen) {
         setIsFullscreen(false);
       }
+      // Zoom shortcuts
+      if ((e.ctrlKey || e.metaKey) && viewMode === 'editor') {
+        if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          handleZoomIn();
+        } else if (e.key === '-') {
+          e.preventDefault();
+          handleZoomOut();
+        } else if (e.key === '0') {
+          e.preventDefault();
+          handleResetZoom();
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, handleSaveDiagram, isFullscreen]);
+  }, [viewMode, handleSaveDiagram, isFullscreen, handleZoomIn, handleZoomOut, handleResetZoom]);
+
+  // Mouse wheel zoom in fullscreen
+  useEffect(() => {
+    if (!isFullscreen || viewMode !== 'editor') return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          handleZoomIn();
+        } else {
+          handleZoomOut();
+        }
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, [isFullscreen, viewMode, handleZoomIn, handleZoomOut]);
 
   const activeDiagram = activeDiagramId ? getDiagram(activeDiagramId) : null;
 
@@ -381,7 +729,121 @@ export default function Diagrams() {
     );
   }
 
-  // Editor View
+  // Mermaid Editor View
+  if (viewMode === 'mermaid-editor' && activeDiagram) {
+    return (
+      <div className={cn(
+        "flex flex-col",
+        isFullscreen ? "fixed inset-0 z-50 bg-background" : "h-[calc(100vh-8rem)]"
+      )}>
+        {/* Editor Header */}
+        <div className="flex items-center justify-between p-2 bg-card border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={handleBackToGallery}>
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Back
+            </Button>
+            <div className="h-5 w-px bg-border" />
+            <div className="flex items-center gap-2">
+              <Code className="w-4 h-4 text-primary" />
+              <div>
+                <h2 className="font-semibold text-foreground text-sm">{activeDiagram.name}</h2>
+                <p className="text-[10px] text-muted-foreground">
+                  Mermaid Diagram
+                  {hasUnsavedChanges && ' • Unsaved'}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={() => handleEditMetadata(activeDiagram)}>
+              <Edit className="w-3 h-3 mr-1" />
+              Edit
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleExport('png')}>
+              <Image className="w-3 h-3 mr-1" />
+              PNG
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleExport('svg')}>
+              <FileCode className="w-3 h-3 mr-1" />
+              SVG
+            </Button>
+            <Button size="sm" onClick={handleSaveDiagram} disabled={!hasUnsavedChanges}>
+              <Save className="w-3 h-3 mr-1" />
+              Save
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(!isFullscreen)}>
+              {isFullscreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+          {/* Code Editor */}
+          <div className="w-1/2 flex flex-col border-r border-border">
+            <div className="p-2 bg-muted/30 border-b border-border flex items-center justify-between">
+              <span className="text-xs font-medium">Mermaid Code</span>
+              <a 
+                href="https://mermaid.js.org/syntax/flowchart.html" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline"
+              >
+                Syntax Guide ↗
+              </a>
+            </div>
+            <textarea
+              value={mermaidCode}
+              onChange={(e) => {
+                setMermaidCode(e.target.value);
+                setHasUnsavedChanges(true);
+              }}
+              className="flex-1 w-full p-4 font-mono text-sm bg-background resize-none focus:outline-none"
+              placeholder="Enter your Mermaid diagram code here..."
+              spellCheck={false}
+            />
+            
+            {/* AI Assistant */}
+            <MermaidAIAssistant
+              currentCode={mermaidCode}
+              onApplyCode={(code) => {
+                setMermaidCode(code);
+                setHasUnsavedChanges(true);
+              }}
+              mermaidError={mermaidError}
+            />
+          </div>
+
+          {/* Preview */}
+          <div className="w-1/2 flex flex-col bg-white dark:bg-gray-900">
+            <div className="p-2 bg-muted/30 border-b border-border">
+              <span className="text-xs font-medium">Preview</span>
+            </div>
+            <div 
+              ref={mermaidContainerRef}
+              className="flex-1 overflow-auto p-4 flex items-center justify-center"
+            >
+              {mermaidError ? (
+                <div className="text-destructive text-center p-4">
+                  <p className="font-medium mb-2">Syntax Error</p>
+                  <p className="text-sm opacity-80">{mermaidError}</p>
+                </div>
+              ) : mermaidSvg ? (
+                <div 
+                  className="mermaid-output"
+                  dangerouslySetInnerHTML={{ __html: mermaidSvg }} 
+                />
+              ) : (
+                <p className="text-muted-foreground text-sm">Enter Mermaid code to see preview</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Tldraw Editor View
   if (viewMode === 'editor' && activeDiagram) {
     return (
       <div className={cn(
@@ -405,13 +867,47 @@ export default function Diagrams() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1 mr-2 bg-muted/50 rounded-lg px-1">
+              <Button variant="ghost" size="sm" onClick={handleZoomOut} title="Zoom Out">
+                <ZoomOut className="w-3 h-3" />
+              </Button>
+              <span className="text-xs font-mono w-12 text-center">{zoomLevel}%</span>
+              <Button variant="ghost" size="sm" onClick={handleZoomIn} title="Zoom In">
+                <ZoomIn className="w-3 h-3" />
+              </Button>
+              <div className="h-4 w-px bg-border mx-1" />
+              <Button variant="ghost" size="sm" onClick={handleZoomToFit} title="Fit to Screen">
+                <Minimize2 className="w-3 h-3" />
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleResetZoom} title="Reset Zoom">
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+            </div>
+            
+            <Button 
+              variant={showGrid ? "secondary" : "ghost"} 
+              size="sm" 
+              onClick={() => setShowGrid(!showGrid)}
+              title="Toggle Grid"
+            >
+              <Grid className="w-3 h-3" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setIsKeyboardDialogOpen(true)} title="Keyboard Shortcuts">
+              <Keyboard className="w-3 h-3" />
+            </Button>
+            <div className="h-4 w-px bg-border mx-1" />
             <Button variant="outline" size="sm" onClick={() => handleEditMetadata(activeDiagram)}>
               <Edit className="w-3 h-3 mr-1" />
               Edit
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport(activeDiagram)}>
-              <Download className="w-3 h-3 mr-1" />
-              Export
+            <Button variant="outline" size="sm" onClick={() => handleExport('png')}>
+              <Image className="w-3 h-3 mr-1" />
+              PNG
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => handleExport('svg')}>
+              <FileCode className="w-3 h-3 mr-1" />
+              SVG
             </Button>
             <Button size="sm" onClick={handleSaveDiagram} disabled={!hasUnsavedChanges}>
               <Save className="w-3 h-3 mr-1" />
@@ -575,7 +1071,7 @@ export default function Diagrams() {
             <Tldraw
               onMount={(editor) => {
                 editorRef.current = editor;
-                if (activeDiagram.data) {
+                if (activeDiagram.data && activeDiagram.data.type !== 'mermaid') {
                   try {
                     editor.store.loadSnapshot(activeDiagram.data);
                   } catch (e) {
@@ -583,8 +1079,22 @@ export default function Diagrams() {
                   }
                 }
                 editor.store.listen(() => setHasUnsavedChanges(true), { scope: 'document' });
+                // Update zoom level
+                setZoomLevel(Math.round(editor.getZoomLevel() * 100));
+                
+                // Listen for zoom changes
+                editor.store.listen(() => {
+                  setZoomLevel(Math.round(editor.getZoomLevel() * 100));
+                }, { scope: 'session' });
               }}
             />
+            
+            {/* Fullscreen zoom hint */}
+            {isFullscreen && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded-full text-xs pointer-events-none opacity-70">
+                Ctrl + Scroll to zoom • Escape to exit
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -694,6 +1204,7 @@ export default function Diagrams() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredDiagrams.map((diagram) => {
             const category = DIAGRAM_CATEGORIES.find((c) => c.value === diagram.category);
+            const isMermaid = diagram.data?.type === 'mermaid';
             return (
               <Card
                 key={diagram.id}
@@ -704,7 +1215,10 @@ export default function Diagrams() {
                   {diagram.thumbnail ? (
                     <img src={diagram.thumbnail} alt={diagram.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl">{category?.icon || '📋'}</div>
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+                      <span className="text-4xl">{isMermaid ? '📊' : category?.icon || '📋'}</span>
+                      {isMermaid && <span className="text-xs text-muted-foreground">Mermaid</span>}
+                    </div>
                   )}
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <Button size="sm" variant="secondary">Open</Button>
@@ -712,7 +1226,10 @@ export default function Diagrams() {
                 </div>
                 <CardContent className="p-3">
                   <h3 className="font-medium truncate">{diagram.name}</h3>
-                  <p className="text-xs text-muted-foreground">{category?.icon} {category?.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isMermaid && <Code className="w-3 h-3 inline mr-1" />}
+                    {category?.icon} {category?.label}
+                  </p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[10px] text-muted-foreground">
                       {new Date(diagram.updatedAt).toLocaleDateString()}
@@ -735,6 +1252,7 @@ export default function Diagrams() {
         <div className="space-y-2">
           {filteredDiagrams.map((diagram) => {
             const category = DIAGRAM_CATEGORIES.find((c) => c.value === diagram.category);
+            const isMermaid = diagram.data?.type === 'mermaid';
             return (
               <div
                 key={diagram.id}
@@ -742,10 +1260,13 @@ export default function Diagrams() {
                 onClick={() => handleOpenDiagram(diagram)}
               >
                 <div className="w-16 h-12 bg-muted/20 rounded flex items-center justify-center text-2xl">
-                  {diagram.thumbnail ? <img src={diagram.thumbnail} alt="" className="w-full h-full object-cover rounded" /> : category?.icon}
+                  {diagram.thumbnail ? <img src={diagram.thumbnail} alt="" className="w-full h-full object-cover rounded" /> : (isMermaid ? '📊' : category?.icon)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium">{diagram.name}</h3>
+                  <h3 className="font-medium flex items-center gap-2">
+                    {diagram.name}
+                    {isMermaid && <Code className="w-3 h-3 text-muted-foreground" />}
+                  </h3>
                   <p className="text-xs text-muted-foreground">{category?.label} • {new Date(diagram.updatedAt).toLocaleDateString()}</p>
                 </div>
                 <div className="flex gap-1">
@@ -763,6 +1284,42 @@ export default function Diagrams() {
         <form onSubmit={handleCreateDiagram}>
           <div className="space-y-4">
             <Input label="Diagram Name" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., Home Network" required />
+            
+            {/* Diagram Type Selection */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Diagram Type</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormType('tldraw')}
+                  className={cn(
+                    "flex-1 p-3 rounded-lg border-2 transition-all text-left",
+                    formType === 'tldraw' 
+                      ? "border-primary bg-primary/5" 
+                      : "border-border hover:border-muted-foreground"
+                  )}
+                >
+                  <Shapes className="w-5 h-5 mb-1" />
+                  <p className="font-medium text-sm">Visual Editor</p>
+                  <p className="text-xs text-muted-foreground">Drag & drop shapes</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormType('mermaid')}
+                  className={cn(
+                    "flex-1 p-3 rounded-lg border-2 transition-all text-left",
+                    formType === 'mermaid' 
+                      ? "border-primary bg-primary/5" 
+                      : "border-border hover:border-muted-foreground"
+                  )}
+                >
+                  <Code className="w-5 h-5 mb-1" />
+                  <p className="font-medium text-sm">Mermaid Code</p>
+                  <p className="text-xs text-muted-foreground">Write diagrams as code</p>
+                </button>
+              </div>
+            </div>
+
             <Select
               label="Category"
               value={formCategory}
@@ -804,6 +1361,21 @@ export default function Diagrams() {
         <DialogFooter>
           <Button variant="outline" onClick={() => { setIsDeleteDialogOpen(false); setSelectedDiagram(null); }}>Cancel</Button>
           <Button variant="destructive" onClick={handleDeleteDiagram}><Trash2 className="w-4 h-4 mr-2" />Delete</Button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Keyboard Shortcuts Dialog */}
+      <Dialog open={isKeyboardDialogOpen} onClose={() => setIsKeyboardDialogOpen(false)} title="Keyboard Shortcuts" maxWidth="sm">
+        <div className="space-y-2">
+          {KEYBOARD_SHORTCUTS.map((shortcut) => (
+            <div key={shortcut.key} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+              <span className="text-sm text-muted-foreground">{shortcut.action}</span>
+              <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">{shortcut.key}</kbd>
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button onClick={() => setIsKeyboardDialogOpen(false)}>Close</Button>
         </DialogFooter>
       </Dialog>
     </div>

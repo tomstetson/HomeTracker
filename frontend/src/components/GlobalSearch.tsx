@@ -4,7 +4,8 @@ import { Dialog, Transition } from '@headlessui/react';
 import {
   Search, X, FileText, FolderKanban, Package, Wrench, Users,
   Shield, Heart, Settings, Home, HardDrive, FileSpreadsheet,
-  ArrowRight, Command, CornerDownLeft, PenTool
+  ArrowRight, Command, CornerDownLeft, PenTool, Sparkles, RefreshCw,
+  MessageSquare
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -16,15 +17,33 @@ import { useWarrantyStore } from '../store/warrantyStore';
 import { useMaintenanceStore } from '../store/maintenanceStore';
 import { useDocumentStore } from '../store/documentStore';
 import { useDiagramStore } from '../store/diagramStore';
+import { useAISettingsStore } from '../store/aiSettingsStore';
+
+// Import AI service
+import { askAboutHome, isAIReady } from '../lib/aiService';
 
 interface SearchResult {
   id: string;
-  type: 'page' | 'project' | 'item' | 'vendor' | 'warranty' | 'maintenance' | 'document';
+  type: 'page' | 'project' | 'item' | 'vendor' | 'warranty' | 'maintenance' | 'document' | 'ai';
   title: string;
   subtitle?: string;
   icon: React.ReactNode;
   href: string;
   highlight?: string;
+}
+
+// Detect if query is a natural language question
+function isNaturalLanguageQuery(query: string): boolean {
+  if (!query || query.length < 5) return false;
+  
+  const questionPatterns = [
+    /^(what|when|where|who|why|how|which|is|are|do|does|can|could|should|will|would)\b/i,
+    /\?$/,
+    /^(show|list|find|tell|get|give)\s+me\b/i,
+    /^(i\s+want|i\s+need|help\s+me)\b/i,
+  ];
+  
+  return questionPatterns.some(pattern => pattern.test(query.trim()));
 }
 
 // Navigation pages
@@ -48,6 +67,10 @@ export function GlobalSearch() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [showAiSuggestion, setShowAiSuggestion] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -59,6 +82,11 @@ export function GlobalSearch() {
   const { tasks } = useMaintenanceStore();
   const { documents } = useDocumentStore();
   const { diagrams } = useDiagramStore();
+  
+  // AI settings
+  const { isFeatureEnabled } = useAISettingsStore();
+  const aiReady = isAIReady();
+  const aiSearchEnabled = isFeatureEnabled('enableNaturalLanguageSearch');
 
   // Keyboard shortcut to open
   useEffect(() => {
@@ -84,8 +112,42 @@ export function GlobalSearch() {
       setQuery('');
       setResults([]);
       setSelectedIndex(0);
+      setAiResponse(null);
+      setAiError(null);
+      setShowAiSuggestion(false);
     }
   }, [isOpen]);
+
+  // Detect if query looks like a question and show AI suggestion
+  useEffect(() => {
+    if (aiSearchEnabled && aiReady.ready && query.length >= 5) {
+      setShowAiSuggestion(isNaturalLanguageQuery(query));
+    } else {
+      setShowAiSuggestion(false);
+    }
+  }, [query, aiSearchEnabled, aiReady.ready]);
+
+  // Handle AI query
+  const handleAskAI = useCallback(async () => {
+    if (!query.trim() || aiLoading) return;
+    
+    setAiLoading(true);
+    setAiError(null);
+    setAiResponse(null);
+    
+    try {
+      const response = await askAboutHome(query);
+      if (response.success) {
+        setAiResponse(response.content || 'No response received.');
+      } else {
+        setAiError(response.error || 'Failed to get AI response.');
+      }
+    } catch (error: any) {
+      setAiError(error.message || 'An error occurred.');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [query, aiLoading]);
 
   // Search function
   const search = useCallback((searchQuery: string) => {
@@ -312,6 +374,7 @@ export function GlobalSearch() {
     warranty: 'Warranties',
     maintenance: 'Maintenance',
     document: 'Documents',
+    ai: 'AI Suggestions',
   };
 
   return (
@@ -378,12 +441,89 @@ export function GlobalSearch() {
                   )}
                 </div>
 
+                {/* AI Suggestion Banner */}
+                {showAiSuggestion && !aiResponse && !aiLoading && (
+                  <div className="px-4 py-3 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border-b border-purple-500/20">
+                    <button
+                      onClick={handleAskAI}
+                      className="w-full flex items-center gap-3 text-left group"
+                    >
+                      <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-gradient-to-r from-purple-500 to-blue-500">
+                        <Sparkles className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-foreground flex items-center gap-2">
+                          Ask AI Assistant
+                          <span className="text-xs text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-full">
+                            AI
+                          </span>
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Get an intelligent answer about your home
+                        </p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-purple-500 transition-colors" />
+                    </button>
+                  </div>
+                )}
+
+                {/* AI Loading State */}
+                {aiLoading && (
+                  <div className="px-4 py-8 text-center">
+                    <div className="flex items-center justify-center gap-2 text-purple-500">
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span>AI is thinking...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Response */}
+                {aiResponse && (
+                  <div className="border-b border-border">
+                    <div className="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider bg-gradient-to-r from-purple-500/10 to-blue-500/10 flex items-center gap-2">
+                      <Sparkles className="w-3 h-3 text-purple-500" />
+                      AI Response
+                    </div>
+                    <div className="px-4 py-4 max-h-60 overflow-y-auto">
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <p className="text-foreground whitespace-pre-wrap text-sm leading-relaxed">
+                          {aiResponse}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="px-4 py-2 border-t border-border/50 bg-muted/30">
+                      <button
+                        onClick={() => { setAiResponse(null); setShowAiSuggestion(true); }}
+                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      >
+                        <X className="w-3 h-3" /> Clear AI response
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Error */}
+                {aiError && (
+                  <div className="px-4 py-3 bg-destructive/10 text-destructive text-sm border-b border-destructive/20">
+                    <p>{aiError}</p>
+                  </div>
+                )}
+
                 {/* Results */}
                 <div className="max-h-80 overflow-y-auto">
-                  {results.length === 0 && query && (
+                  {results.length === 0 && query && !aiResponse && !aiLoading && (
                     <div className="px-4 py-8 text-center text-muted-foreground">
                       <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
                       <p>No results for "{query}"</p>
+                      {aiSearchEnabled && aiReady.ready && (
+                        <button
+                          onClick={handleAskAI}
+                          className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-500/20 transition-colors"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          Try asking AI instead
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -445,6 +585,12 @@ export function GlobalSearch() {
                       Close
                     </span>
                   </div>
+                  {aiSearchEnabled && aiReady.ready && (
+                    <div className="flex items-center gap-1 text-purple-500">
+                      <Sparkles className="w-3 h-3" />
+                      <span>AI enabled</span>
+                    </div>
+                  )}
                 </div>
               </Dialog.Panel>
             </Transition.Child>

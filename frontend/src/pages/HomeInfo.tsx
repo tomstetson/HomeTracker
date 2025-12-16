@@ -21,10 +21,23 @@ import {
   MapPin,
   Plus,
   Edit,
+  RefreshCw,
+  Cloud,
+  AlertCircle,
+  CheckCircle,
+  Download,
+  Sparkles,
+  BarChart3,
 } from 'lucide-react';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { useHomeVitalsStore, PaintColor, EmergencyContact, HomeValue } from '../store/homeVitalsStore';
+import { usePropertyValueStore } from '../store/propertyValueStore';
+import { fetchPropertyValue, shouldAutoUpdate, formatPropertyValue } from '../lib/propertyValueService';
 import { EditableSelect } from '../components/ui/EditableSelect';
+import { ValueTrendChart } from '../components/ui/Chart';
+import { askAboutHome } from '../lib/aiService';
+import { useAISettingsStore } from '../store/aiSettingsStore';
+import { isAIReady } from '../lib/aiService';
 
 // Property settings stored in localStorage
 interface PropertySettings {
@@ -72,6 +85,23 @@ export default function HomeInfo() {
   const [settings, setSettings] = useState<PropertySettings>(DEFAULT_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('property');
+  const [isFetchingValue, setIsFetchingValue] = useState(false);
+  const [valueInsights, setValueInsights] = useState<string | null>(null);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  
+  // Property value store
+  const {
+    config: propertyValueConfig,
+    currentEstimate,
+    updateError,
+    setCurrentEstimate,
+    setUpdateError,
+    setLastUpdateAttempt,
+  } = usePropertyValueStore();
+  
+  // AI settings
+  const { isFeatureEnabled } = useAISettingsStore();
+  const aiReady = isAIReady();
   
   // Dialog states
   const [isPaintDialogOpen, setIsPaintDialogOpen] = useState(false);
@@ -232,13 +262,105 @@ export default function HomeInfo() {
     toast.success('Added', `Value of ${formatCurrency(value.value)} recorded`);
   };
 
+  // Fetch property value from API
+  const fetchPropertyValueFromAPI = async () => {
+    if (!settings.address || !settings.city || !settings.state || !settings.zipCode) {
+      return;
+    }
+    
+    if (propertyValueConfig.provider === 'none') {
+      return;
+    }
+    
+    setIsFetchingValue(true);
+    setUpdateError(null);
+    
+    try {
+      const estimate = await fetchPropertyValue(
+        settings.address,
+        settings.city,
+        settings.state,
+        settings.zipCode,
+        propertyValueConfig
+      );
+      
+      setCurrentEstimate(estimate);
+      setLastUpdateAttempt(new Date().toISOString());
+      
+      if (estimate.error) {
+        setUpdateError(estimate.error);
+        toast.error('Value Fetch Failed', estimate.error);
+      } else if (estimate.value > 0) {
+        // Auto-add to home values if it's a new value
+        const existingValue = homeValues.find(
+          v => v.date === estimate.lastUpdated.split('T')[0] && v.source === estimate.source
+        );
+        
+        if (!existingValue) {
+          addHomeValue({
+            date: estimate.lastUpdated.split('T')[0],
+            value: estimate.value,
+            source: estimate.source === 'rentcast' ? 'RentCast API' : estimate.source,
+            notes: estimate.confidence ? `Confidence: ${Math.round(estimate.confidence * 100)}%` : undefined,
+          });
+          toast.success('Value Updated', `Current value: ${formatCurrency(estimate.value)}`);
+        }
+      }
+    } catch (error: any) {
+      setUpdateError(error.message);
+      toast.error('Value Fetch Failed', error.message);
+    } finally {
+      setIsFetchingValue(false);
+    }
+  };
+  
+  // Auto-fetch on mount or when address/config changes
+  useEffect(() => {
+    if (
+      propertyValueConfig.autoUpdate &&
+      propertyValueConfig.provider !== 'none' &&
+      settings.address &&
+      settings.city &&
+      settings.state &&
+      settings.zipCode
+    ) {
+      const lastEstimate = currentEstimate;
+      const shouldUpdate = !lastEstimate || 
+        shouldAutoUpdate(lastEstimate.lastUpdated, propertyValueConfig.updateFrequency);
+      
+      if (shouldUpdate) {
+        fetchPropertyValueFromAPI();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    settings.address,
+    settings.city,
+    settings.state,
+    settings.zipCode,
+    propertyValueConfig.provider,
+    propertyValueConfig.autoUpdate,
+    propertyValueConfig.updateFrequency,
+    currentEstimate?.lastUpdated,
+  ]);
+  
   // Calculate home value stats
   const latestValue = homeValues.length > 0 
     ? [...homeValues].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
     : null;
   
+  // Use API estimate if it's newer than manual entry
+  const displayValue = currentEstimate && currentEstimate.value > 0 && 
+    (!latestValue || new Date(currentEstimate.lastUpdated) > new Date(latestValue.date))
+    ? {
+        value: currentEstimate.value,
+        date: currentEstimate.lastUpdated.split('T')[0],
+        source: currentEstimate.source === 'rentcast' ? 'RentCast API' : currentEstimate.source,
+      }
+    : latestValue;
+  
   const purchaseValue = settings.purchasePrice ? parseFloat(settings.purchasePrice.replace(/[^0-9.-]/g, '')) : 0;
-  const appreciation = latestValue ? latestValue.value - purchaseValue : 0;
+  const appreciation = displayValue ? displayValue.value - purchaseValue : 0;
 
   const tabs = [
     { id: 'property' as TabType, label: 'Property', icon: Home },
@@ -448,12 +570,79 @@ export default function HomeInfo() {
                 <h2 className="text-lg font-semibold text-foreground flex items-center">
                   <TrendingUp className="w-5 h-5 mr-2" />
                   Home Value
+                  {propertyValueConfig.provider !== 'none' && (
+                    <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 flex items-center gap-1">
+                      <Cloud className="w-3 h-3" />
+                      Auto-tracking
+                    </span>
+                  )}
                 </h2>
-                <Button onClick={() => setIsValueDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Value
-                </Button>
+                <div className="flex gap-2">
+                  {propertyValueConfig.provider !== 'none' && (
+                    <Button
+                      variant="outline"
+                      onClick={fetchPropertyValueFromAPI}
+                      disabled={isFetchingValue || !settings.address}
+                    >
+                      {isFetchingValue ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Fetching...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Refresh Value
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  <Button onClick={() => setIsValueDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Manual Value
+                  </Button>
+                </div>
               </div>
+              
+              {/* API Status */}
+              {propertyValueConfig.provider !== 'none' && (
+                <div className="mb-4">
+                  {updateError && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-800 dark:text-red-300">Update Failed</p>
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">{updateError}</p>
+                      </div>
+                    </div>
+                  )}
+                  {currentEstimate && currentEstimate.value > 0 && !updateError && (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-start gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                          Last updated: {new Date(currentEstimate.lastUpdated).toLocaleString()}
+                        </p>
+                        {currentEstimate.confidence && (
+                          <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                            Confidence: {Math.round(currentEstimate.confidence * 100)}%
+                            {currentEstimate.lowEstimate && currentEstimate.highEstimate && (
+                              <> • Range: {formatCurrency(currentEstimate.lowEstimate)} - {formatCurrency(currentEstimate.highEstimate)}</>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {propertyValueConfig.provider === 'rentcast' && !propertyValueConfig.apiKey && (
+                    <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                      <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                        Configure your RentCast API key in Settings to enable automatic value tracking.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-muted/20 rounded-lg">
@@ -465,11 +654,16 @@ export default function HomeInfo() {
                 <div className="p-4 bg-muted/20 rounded-lg">
                   <p className="text-sm text-muted-foreground">Current Value</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {latestValue ? formatCurrency(latestValue.value) : '—'}
+                    {displayValue ? formatCurrency(displayValue.value) : '—'}
                   </p>
-                  {latestValue && (
+                  {displayValue && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      as of {formatDate(latestValue.date)}
+                      as of {formatDate(displayValue.date)} • {displayValue.source}
+                    </p>
+                  )}
+                  {currentEstimate && currentEstimate.lowEstimate && currentEstimate.highEstimate && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Range: {formatCurrency(currentEstimate.lowEstimate)} - {formatCurrency(currentEstimate.highEstimate)}
                     </p>
                   )}
                 </div>
@@ -485,6 +679,115 @@ export default function HomeInfo() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Value Trends Chart */}
+          {homeValues.length > 0 && (
+            <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-foreground flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2" />
+                    Value Trends
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      // Export value report
+                      const data = homeValues.map(v => ({
+                        Date: v.date,
+                        Value: formatCurrency(v.value),
+                        Source: v.source,
+                        Notes: v.notes || '',
+                      }));
+                      
+                      const csv = [
+                        Object.keys(data[0]).join(','),
+                        ...data.map(row => Object.values(row).join(','))
+                      ].join('\n');
+                      
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `home-value-report-${new Date().toISOString().split('T')[0]}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast.success('Exported', 'Value report downloaded');
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Report
+                  </Button>
+                </div>
+                <ValueTrendChart
+                  data={homeValues.map(v => ({
+                    date: v.date,
+                    value: v.value,
+                    purchasePrice: purchaseValue > 0 ? purchaseValue : undefined,
+                  }))}
+                  purchasePrice={purchaseValue > 0 ? purchaseValue : undefined}
+                  showRange={currentEstimate?.lowEstimate && currentEstimate?.highEstimate ? true : false}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* AI Insights */}
+          {homeValues.length > 0 && purchaseValue > 0 && aiReady.ready && isFeatureEnabled('enableSmartAssistant') && (
+            <Card className="bg-card/80 backdrop-blur-sm border-border/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-foreground flex items-center">
+                    <Sparkles className="w-5 h-5 mr-2 text-purple-500" />
+                    AI Insights
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setIsGeneratingInsights(true);
+                      try {
+                        const question = `Analyze my home value trends. Purchase price: ${formatCurrency(purchaseValue)}, Current value: ${displayValue ? formatCurrency(displayValue.value) : 'unknown'}, Appreciation: ${appreciation > 0 ? '+' : ''}${formatCurrency(appreciation)}. I have ${homeValues.length} value records. Provide insights about appreciation rate, market trends, and recommendations.`;
+                        const response = await askAboutHome(question);
+                        if (response.success) {
+                          setValueInsights(response.content || 'No insights available');
+                        } else {
+                          toast.error('Failed', response.error || 'Could not generate insights');
+                        }
+                      } catch (error: any) {
+                        toast.error('Error', error.message);
+                      } finally {
+                        setIsGeneratingInsights(false);
+                      }
+                    }}
+                    disabled={isGeneratingInsights}
+                  >
+                    {isGeneratingInsights ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Generate Insights
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {valueInsights ? (
+                  <div className="p-4 bg-muted/20 rounded-lg">
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{valueInsights}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Click "Generate Insights" to get AI-powered analysis of your home value trends.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Value History */}
           <Card className="bg-card/80 backdrop-blur-sm border-border/50">

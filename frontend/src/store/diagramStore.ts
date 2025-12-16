@@ -119,3 +119,9 @@ export const useDiagramStore = create<DiagramStore>((set, get) => ({
 // Load on initialization
 useDiagramStore.getState().loadFromStorage();
 
+
+
+
+
+
+

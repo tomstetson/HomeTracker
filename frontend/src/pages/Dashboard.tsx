@@ -6,15 +6,27 @@ import { useInventoryStore } from '../store/inventoryStore';
 import { useMaintenanceStore } from '../store/maintenanceStore';
 import { useWarrantyStore } from '../store/warrantyStore';
 import { cn, formatCurrency } from '../lib/utils';
+import { AIQueryPanel } from '../components/AIQueryPanel';
+import { useAISettingsStore } from '../store/aiSettingsStore';
 
 export default function Dashboard() {
   const projects = useProjectStore((state) => state.projects);
   const items = useInventoryStore((state) => state.items);
   const { getUpcomingTasks } = useMaintenanceStore();
   const { getExpiringWarranties } = useWarrantyStore();
+  
+  // Subscribe to AI settings state for reactivity
+  const aiSettings = useAISettingsStore((state) => state.settings);
+  const { isFeatureEnabled } = useAISettingsStore();
 
   const upcomingTasks = getUpcomingTasks();
   const expiringWarranties = getExpiringWarranties(90);
+  
+  // Check if smart assistant is enabled (reactive to aiSettings changes)
+  const showAIAssistant = aiSettings.activeProvider !== 'none' && 
+    aiSettings.providers[aiSettings.activeProvider]?.enabled && 
+    !!aiSettings.providers[aiSettings.activeProvider]?.apiKey &&
+    aiSettings.features?.enableSmartAssistant;
 
   const stats = {
     totalItems: items.length,
@@ -227,6 +239,17 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Floating AI Assistant Panel */}
+      {showAIAssistant && (
+        <AIQueryPanel
+          title="Home Assistant"
+          context="general"
+          floating={true}
+          defaultCollapsed={true}
+          minHeight="450px"
+        />
+      )}
     </div>
   );
 }
