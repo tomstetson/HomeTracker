@@ -1,0 +1,13 @@
+{
+  "name": "hometracker-root",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "security:audit": "powershell -ExecutionPolicy Bypass -File ./scripts/security-audit.ps1"
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "@secretlint/quick-start": "^8.0.0"
+  }
+}

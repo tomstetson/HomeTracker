@@ -1,0 +1,9 @@
+{
+  "*": "secretlint",
+  "backend/**/*.{js,ts,json}": [
+    "cd backend && npm audit"
+  ],
+  "frontend/**/*.{js,ts,json}": [
+    "cd frontend && npm audit"
+  ]
+}
