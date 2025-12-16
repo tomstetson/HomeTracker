@@ -18,6 +18,7 @@ import projectRoutes from './routes/project.routes';
 import documentRoutes from './routes/document.routes';
 import excelRoutes from './routes/excel.routes';
 import fileRoutes from './routes/file.routes';
+import propertyRoutes from './routes/property.routes';
 
 // Import Excel service for graceful shutdown
 import { excelService } from './services/excel.service';
@@ -55,6 +56,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/excel', excelRoutes);
 app.use('/api/files', fileRoutes);
+app.use('/api/property', propertyRoutes);
 
 // Settings routes
 app.get('/api/settings', (req: Request, res: Response) => {

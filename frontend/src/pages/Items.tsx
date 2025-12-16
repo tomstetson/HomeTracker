@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useInventoryStore, InventoryItem, SaleRecord, ConsumableInfo } from '../store/inventoryStore';
 import { useOptionsStore } from '../store/optionsStore';
 import { Card, CardContent } from '../components/ui/Card';
@@ -6,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { useConfirm } from '../components/ui/ConfirmDialog';
 import {
   Plus,
   Search,
@@ -25,6 +27,7 @@ import {
   Tag,
   RefreshCw,
   Warehouse,
+  Wand2,
 } from 'lucide-react';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 
@@ -49,7 +52,9 @@ export default function Items() {
     getTotalSaleRecoup,
   } = useInventoryStore();
   
+  const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
   
   // View state
   const [activeTab, setActiveTab] = useState<TabType>('active');
@@ -356,6 +361,14 @@ export default function Items() {
             <Settings className="w-4 h-4 mr-2" />
             Categories
           </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/inventory-wizard')}
+            className="bg-gradient-to-r from-purple-500 to-blue-500 text-white border-0 hover:from-purple-600 hover:to-blue-600"
+          >
+            <Wand2 className="w-4 h-4 mr-2" />
+            AI Wizard
+          </Button>
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Add Item
@@ -473,8 +486,15 @@ export default function Items() {
             variant="destructive" 
             size="sm" 
             className="ml-auto"
-            onClick={() => {
-              if (confirm('Permanently delete all items in trash?')) {
+            onClick={async () => {
+              const confirmed = await confirm({
+                title: 'Empty Trash?',
+                message: `This will permanently delete ${stats.trashedItems} item${stats.trashedItems > 1 ? 's' : ''}. This action cannot be undone.`,
+                confirmText: 'Delete Permanently',
+                cancelText: 'Cancel',
+                variant: 'danger',
+              });
+              if (confirmed) {
                 emptyTrash();
                 toast.success('Trash Emptied', 'All items permanently deleted');
               }

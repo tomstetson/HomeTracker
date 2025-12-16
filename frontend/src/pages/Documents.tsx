@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useDocumentStore, Document } from '../store/documentStore';
+import { useState, useEffect, useCallback, memo } from 'react';
+import { useDocumentStore, Document, DocumentLinkedRecord } from '../store/documentStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
@@ -10,9 +10,58 @@ import {
   FileText, Upload, Search, Edit, Trash2, Download,
   HardDrive, FileImage, FileSpreadsheet, File,
   Loader2, Scan, CheckCircle, AlertTriangle, Clock,
-  ExternalLink
+  ExternalLink, Sparkles, Brain
 } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
+import { DocumentExtractionModal, LinkedRecord } from '../components/DocumentExtractionModal';
+import { ExtractedData, hasExtractedContent } from '../lib/documentExtraction';
+import { useAISettingsStore } from '../store/aiSettingsStore';
+import { isAIReady, classifyDocument } from '../lib/aiService';
+
+// Image Preview component with proper loading state
+const ImagePreview = memo(({ 
+  src, 
+  alt, 
+  fallback 
+}: { 
+  src: string; 
+  alt: string; 
+  fallback: React.ReactNode;
+}) => {
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  
+  return (
+    <>
+      {status !== 'error' && (
+        <img 
+          src={src}
+          alt={alt}
+          className={cn(
+            "w-full h-full object-cover pointer-events-none transition-opacity duration-300",
+            status === 'loading' ? 'opacity-0' : 'opacity-100'
+          )}
+          draggable={false}
+          loading="lazy"
+          onLoad={() => setStatus('loaded')}
+          onError={() => setStatus('error')}
+        />
+      )}
+      {(status === 'loading' || status === 'error') && (
+        <div className={cn(
+          "absolute inset-0 flex flex-col items-center justify-center text-center",
+          status === 'loading' ? 'animate-pulse' : ''
+        )}>
+          {status === 'loading' ? (
+            <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+          ) : (
+            fallback
+          )}
+        </div>
+      )}
+    </>
+  );
+});
+ImagePreview.displayName = 'ImagePreview';
 
 export default function Documents() {
   const { documents, addDocument, updateDocument, deleteDocument } = useDocumentStore();
@@ -29,6 +78,85 @@ export default function Documents() {
   const [storedFiles, setStoredFiles] = useState<StoredFile[]>([]);
   const [, setIsLoadingFiles] = useState(true);
   const [dragActive, setDragActive] = useState(false);
+  const [isExtractionModalOpen, setIsExtractionModalOpen] = useState(false);
+  const [extractionDocument, setExtractionDocument] = useState<Document | null>(null);
+  const [extractionOcrText, setExtractionOcrText] = useState<string>('');
+
+  // AI Settings
+  const { isFeatureEnabled } = useAISettingsStore();
+  const aiReady = isAIReady();
+  const documentIntelligenceEnabled = isFeatureEnabled('enableDocumentIntelligence') && aiReady.ready;
+  const [classifyingDocs, setClassifyingDocs] = useState<Set<string>>(new Set());
+
+  // Generate simple hash from content for deduplication
+  const generateContentHash = (content: string): string => {
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(16);
+  };
+  
+  // Check for duplicate documents
+  const checkForDuplicates = (contentHash: string, fileName: string): Document | null => {
+    const existingDoc = documents.find(doc => 
+      doc.contentHash === contentHash && doc.id !== selectedDocument?.id
+    );
+    
+    if (existingDoc) {
+      return existingDoc;
+    }
+    
+    // Also check for similar filenames (basic fuzzy matching)
+    const similarDoc = documents.find(doc => {
+      const docName = doc.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const newName = fileName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return docName === newName && doc.id !== selectedDocument?.id;
+    });
+    
+    return similarDoc || null;
+  };
+
+  // Auto-classify document after OCR is complete
+  const autoClassifyDocument = async (docId: string, ocrText: string, originalName: string) => {
+    if (!documentIntelligenceEnabled) return;
+    
+    const doc = documents.find(d => d.id === docId);
+    if (!doc || doc.aiClassified) return; // Already classified
+    
+    setClassifyingDocs(prev => new Set(prev).add(docId));
+    
+    try {
+      const result = await classifyDocument(ocrText, originalName);
+      
+      if (result.success && result.classification) {
+        const c = result.classification;
+        updateDocument(docId, {
+          category: c.category,
+          name: c.suggestedName || doc.name,
+          description: c.description || doc.description,
+          aiClassified: true,
+          aiClassifiedAt: new Date().toISOString(),
+          classificationConfidence: c.confidence,
+          detectedVendor: c.detectedVendor,
+          detectedDate: c.detectedDate,
+          suggestedTags: c.tags,
+          contentHash: generateContentHash(ocrText),
+        });
+        toast.success('Auto-classified', `Document identified as: ${c.category}`);
+      }
+    } catch (error) {
+      console.error('Auto-classification failed:', error);
+    } finally {
+      setClassifyingDocs(prev => {
+        const next = new Set(prev);
+        next.delete(docId);
+        return next;
+      });
+    }
+  };
 
   // Load stored files from backend
   useEffect(() => {
@@ -45,6 +173,22 @@ export default function Documents() {
       setIsLoadingFiles(false);
     }
   };
+
+  // Auto-classify unclassified documents when files are loaded or OCR completes
+  useEffect(() => {
+    if (!documentIntelligenceEnabled) return;
+    
+    // Find documents that have OCR text but haven't been classified
+    storedFiles.forEach(file => {
+      if (file.ocrStatus === 'completed' && file.ocrText) {
+        const doc = documents.find(d => d.id === file.id);
+        if (doc && !doc.aiClassified && !classifyingDocs.has(file.id)) {
+          autoClassifyDocument(file.id, file.ocrText, file.originalName);
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storedFiles, documentIntelligenceEnabled, documents]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -70,13 +214,56 @@ export default function Documents() {
     }
   };
 
-  // Filter documents
+  // Filter documents with enhanced search (includes extracted data)
   const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = searchQuery.length <= 2 || 
-      doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || doc.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    if (categoryFilter !== 'all' && doc.category !== categoryFilter) {
+      return false;
+    }
+    
+    if (searchQuery.length <= 2) {
+      return true;
+    }
+    
+    const query = searchQuery.toLowerCase();
+    
+    // Search in basic fields
+    if (doc.name.toLowerCase().includes(query) ||
+        doc.description?.toLowerCase().includes(query) ||
+        doc.detectedVendor?.toLowerCase().includes(query)) {
+      return true;
+    }
+    
+    // Search in extracted data
+    if (doc.aiExtracted) {
+      // Search vendor name
+      if (doc.aiExtracted.vendor?.name?.toLowerCase().includes(query)) {
+        return true;
+      }
+      
+      // Search in items
+      if (doc.aiExtracted.items?.some(item => 
+        item.name?.toLowerCase().includes(query) ||
+        item.brand?.toLowerCase().includes(query) ||
+        item.model?.toLowerCase().includes(query)
+      )) {
+        return true;
+      }
+      
+      // Search receipt total (e.g., "over $500")
+      if (query.includes('$') || query.includes('over') || query.includes('under')) {
+        const receiptTotal = doc.aiExtracted.receipt?.total;
+        if (receiptTotal) {
+          const amount = parseFloat(query.replace(/[^0-9.]/g, ''));
+          if (!isNaN(amount)) {
+            if (query.includes('over') && receiptTotal >= amount) return true;
+            if (query.includes('under') && receiptTotal <= amount) return true;
+            if (receiptTotal >= amount * 0.9 && receiptTotal <= amount * 1.1) return true; // Within 10%
+          }
+        }
+      }
+    }
+    
+    return false;
   });
 
   // Handle file upload
@@ -89,9 +276,24 @@ export default function Documents() {
     try {
       const fileArray = Array.from(files);
       let completed = 0;
+      const duplicateWarnings: string[] = [];
 
       for (const file of fileArray) {
         const storedFile = await fileApi.uploadFile(file);
+        
+        // Check for duplicates after OCR (if available)
+        let duplicateDoc: Document | null = null;
+        if (storedFile.ocrText) {
+          const contentHash = generateContentHash(storedFile.ocrText);
+          duplicateDoc = checkForDuplicates(contentHash, storedFile.originalName);
+        } else {
+          // Check by filename if OCR not available yet
+          duplicateDoc = checkForDuplicates('', storedFile.originalName);
+        }
+        
+        if (duplicateDoc) {
+          duplicateWarnings.push(`${file.name} - Similar to "${duplicateDoc.name}"`);
+        }
         
         // Create document entry
         const newDoc: Document = {
@@ -102,6 +304,7 @@ export default function Documents() {
           fileSize: storedFile.size,
           uploadDate: new Date().toISOString().split('T')[0],
           url: storedFile.path,
+          contentHash: storedFile.ocrText ? generateContentHash(storedFile.ocrText) : undefined,
         };
         
         addDocument(newDoc);
@@ -111,6 +314,13 @@ export default function Documents() {
         setUploadProgress((completed / fileArray.length) * 100);
       }
 
+      if (duplicateWarnings.length > 0) {
+        toast.warning(
+          'Possible Duplicates',
+          `${duplicateWarnings.length} file(s) may be duplicates:\n${duplicateWarnings.join('\n')}`
+        );
+      }
+      
       toast.success('Upload Complete', `${fileArray.length} file(s) uploaded successfully`);
       setIsAddDialogOpen(false);
     } catch (error: any) {
@@ -212,6 +422,38 @@ export default function Documents() {
   const handleView = (doc: Document) => {
     setSelectedDocument(doc);
     setIsViewDialogOpen(true);
+  };
+
+  // Handle AI extraction
+  const handleExtract = (doc: Document, ocrText: string) => {
+    setExtractionDocument(doc);
+    setExtractionOcrText(ocrText);
+    setIsExtractionModalOpen(true);
+  };
+
+  // Handle extraction complete
+  const handleExtractionComplete = (data: ExtractedData, linkedRecords: LinkedRecord[]) => {
+    if (extractionDocument) {
+      const docLinkedRecords: DocumentLinkedRecord[] = linkedRecords.map((r) => ({
+        ...r,
+        createdAt: new Date().toISOString(),
+      }));
+      
+      updateDocument(extractionDocument.id, {
+        aiExtracted: data,
+        aiExtractedAt: new Date().toISOString(),
+        linkedRecords: [
+          ...(extractionDocument.linkedRecords || []),
+          ...docLinkedRecords,
+        ],
+      });
+      
+      if (linkedRecords.length > 0) {
+        toast.success('Extraction Complete', `Created ${linkedRecords.length} record(s) from document`);
+      }
+    }
+    setExtractionDocument(null);
+    setExtractionOcrText('');
   };
 
   return (
@@ -337,24 +579,47 @@ export default function Documents() {
                 {/* Preview area */}
                 <div className="aspect-[4/3] mb-3 rounded-lg bg-muted/30 flex items-center justify-center relative overflow-hidden">
                   {storedFile && fileApi.isImage(storedFile.mimeType) ? (
-                    <img 
-                      src={fileApi.getViewUrl(storedFile.id)} 
+                    <ImagePreview
+                      src={fileApi.getViewUrl(storedFile.id)}
                       alt={doc.name}
-                      className="w-full h-full object-cover"
+                      fallback={
+                        <>
+                          {getFileIcon(doc.fileType)}
+                          <p className="text-xs text-muted-foreground mt-1 uppercase">{doc.fileType}</p>
+                        </>
+                      }
                     />
                   ) : (
-                    <div className="text-center">
+                    <div className="text-center flex flex-col items-center justify-center">
                       {getFileIcon(doc.fileType)}
                       <p className="text-xs text-muted-foreground mt-1 uppercase">{doc.fileType}</p>
                     </div>
                   )}
                   
-                  {/* OCR badge */}
-                  {storedFile && storedFile.ocrStatus !== 'not_applicable' && (
-                    <div className="absolute top-2 right-2">
-                      {getOcrStatusBadge(storedFile)}
-                    </div>
-                  )}
+                  {/* OCR and AI badges */}
+                  <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                    {storedFile && storedFile.ocrStatus !== 'not_applicable' && (
+                      getOcrStatusBadge(storedFile)
+                    )}
+                    {classifyingDocs.has(doc.id) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Classifying
+                      </span>
+                    )}
+                    {doc.aiClassified && !classifyingDocs.has(doc.id) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        <CheckCircle className="w-3 h-3" />
+                        AI Classified
+                      </span>
+                    )}
+                    {doc.aiExtracted && hasExtractedContent(doc.aiExtracted) && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                        <Brain className="w-3 h-3" />
+                        AI Extracted
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Info */}
@@ -395,6 +660,18 @@ export default function Documents() {
                     <Edit className="w-3 h-3 mr-1" />
                     Edit
                   </Button>
+                  {/* AI Extract button - only show if not already extracted */}
+                  {documentIntelligenceEnabled && storedFile?.ocrText && !doc.aiExtracted && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="text-purple-600 hover:text-purple-700 dark:text-purple-400"
+                      onClick={() => handleExtract(doc, storedFile.ocrText!)}
+                      title="Extract data with AI"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                    </Button>
+                  )}
                   {storedFile && (
                     <Button 
                       variant="outline" 
@@ -473,7 +750,7 @@ export default function Documents() {
                 <input
                   type="file"
                   multiple
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                  accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
                   className="hidden"
                   onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
                 />
@@ -592,7 +869,8 @@ export default function Documents() {
                   <img 
                     src={fileApi.getViewUrl(storedFile.id)} 
                     alt={selectedDocument.name}
-                    className="max-w-full max-h-full object-contain"
+                    className="max-w-full max-h-full object-contain select-none"
+                    draggable={false}
                   />
                 ) : (
                   <div className="text-center">
@@ -657,6 +935,20 @@ export default function Documents() {
               )}
 
               <DialogFooter>
+                {/* AI Extract button in view dialog - only show if not already extracted */}
+                {documentIntelligenceEnabled && storedFile?.ocrText && !selectedDocument.aiExtracted && (
+                  <Button 
+                    variant="outline"
+                    className="text-purple-600 hover:text-purple-700 dark:text-purple-400"
+                    onClick={() => {
+                      setIsViewDialogOpen(false);
+                      handleExtract(selectedDocument, storedFile.ocrText!);
+                    }}
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Extract Data
+                  </Button>
+                )}
                 {storedFile && (
                   <>
                     <Button 
@@ -681,6 +973,21 @@ export default function Documents() {
           );
         })()}
       </Dialog>
+
+      {/* AI Extraction Modal */}
+      {extractionDocument && (
+        <DocumentExtractionModal
+          open={isExtractionModalOpen}
+          onClose={() => {
+            setIsExtractionModalOpen(false);
+            setExtractionDocument(null);
+            setExtractionOcrText('');
+          }}
+          document={extractionDocument}
+          ocrText={extractionOcrText}
+          onExtractionComplete={handleExtractionComplete}
+        />
+      )}
     </div>
   );
 }

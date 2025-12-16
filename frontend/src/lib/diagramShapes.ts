@@ -305,3 +305,9 @@ export function getAllTemplates(): DiagramTemplate[] {
   return DIAGRAM_TEMPLATES;
 }
 
+
+
+
+
+
+

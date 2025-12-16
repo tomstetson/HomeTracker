@@ -2,7 +2,7 @@
 
 > **Purpose**: This file provides continuity for AI coding assistants (Claude Code, Cursor, Windsurf, etc.) to understand the project's current state, implemented features, and future roadmap.
 > 
-> **Last Updated**: 2024-12-08 | **Version**: 1.4.0
+> **Last Updated**: 2024-12-11 | **Version**: 1.7.0
 
 ---
 
@@ -15,7 +15,8 @@
 - **Backend**: Node.js, Express.js, ExcelJS
 - **Storage**: JSON files + Excel export (hometracker.xlsx)
 - **Deployment**: Docker, Nginx, Supervisor
-- **Special Libraries**: tldraw (diagrams), Tesseract.js (OCR)
+- **Special Libraries**: tldraw (diagrams), mermaid (code diagrams), Tesseract.js (OCR)
+- **AI Integration**: BYOK (Bring Your Own Key) support for OpenAI, Anthropic (Claude), Google Gemini
 
 ### Key Directories
 ```
@@ -48,7 +49,7 @@ HomeTracker/
 | **Maintenance** | `pages/Maintenance.tsx` | Tasks/History tabs, list/card views, recurring tasks, skip cycle, undo complete |
 | **Vendors** | `pages/Vendors.tsx` | Vendor directory with ratings, custom categories, preferred filter |
 | **Documents** | `pages/Documents.tsx` | File upload, OCR text extraction, category filtering |
-| **Diagrams** | `pages/Diagrams.tsx` | Excalidraw editor, inventory integration, 7 diagram types, auto-save |
+| **Diagrams** | `pages/Diagrams.tsx` | tldraw editor, Mermaid code diagrams, zoom controls, PNG/SVG export, inventory integration, 7 diagram types, keyboard shortcuts |
 | **Home Info** | `pages/HomeInfo.tsx` | Property details, value tracking, paint colors, emergency contacts |
 | **Settings** | `pages/Settings.tsx` | Theme toggle, API privacy, data export/import, backup |
 
@@ -61,21 +62,31 @@ HomeTracker/
 | `useMaintenanceStore` | `store/maintenanceStore.ts` | Tasks, history, service records |
 | `useVendorStore` | `store/vendorStore.ts` | Vendor directory |
 | `useDocumentStore` | `store/documentStore.ts` | Document metadata, OCR text |
-| `useDiagramStore` | `store/diagramStore.ts` | Diagrams with Excalidraw data |
+| `useDiagramStore` | `store/diagramStore.ts` | Diagrams with tldraw/Mermaid data |
 | `useHomeVitalsStore` | `store/homeVitalsStore.ts` | Property info, emergency contacts |
 | `useOptionsStore` | `store/optionsStore.ts` | User-customizable dropdown options |
 | `useWarrantyStore` | `store/warrantyStore.ts` | Standalone warranties (legacy) |
+| `useAISettingsStore` | `store/aiSettingsStore.ts` | AI provider config, BYOK API keys |
 
 ### UI Components
 
 | Component | File | Purpose |
 |-----------|------|---------|
 | `Layout` | `components/Layout.tsx` | App shell with sidebar navigation |
-| `GlobalSearch` | `components/GlobalSearch.tsx` | Ctrl+K search dialog |
-| `DiagramInventoryPanel` | `components/DiagramInventoryPanel.tsx` | Inventory sidebar in diagram editor |
+| `GlobalSearch` | `components/GlobalSearch.tsx` | Ctrl+K search dialog with AI natural language |
+| `AIQueryPanel` | `components/AIQueryPanel.tsx` | Reusable AI chat component for any page |
+| `MermaidAIAssistant` | `components/MermaidAIAssistant.tsx` | AI chat for diagram help |
+| `DocumentExtractionModal` | `components/DocumentExtractionModal.tsx` | AI-powered document data extraction |
 | `EditableSelect` | `components/ui/EditableSelect.tsx` | Dropdowns with add/edit/remove |
 | `TagInput` | `components/ui/TagInput.tsx` | Tag management with suggestions |
 | `Toast` | `components/ui/Toast.tsx` | Notification system |
+
+### AI Services (lib/)
+
+| Service | File | Purpose |
+|---------|------|---------|
+| `homeContext.ts` | `lib/homeContext.ts` | Aggregates all stores into AI-ready context |
+| `aiService.ts` | `lib/aiService.ts` | LLM API calls, prompts, response parsing |
 
 ### Backend Services
 
@@ -190,7 +201,7 @@ interface Project {
 ### Medium Priority
 - [ ] **Floor Plan Templates** - Pre-built floor plan shapes in diagram editor
 - [ ] **Multi-Property Support** - Manage multiple homes/properties
-- [ ] **Receipt Scanning** - OCR with automatic data extraction
+- [x] ~~**Receipt Scanning** - OCR with automatic data extraction~~ ✅ v1.7.0 (Document Intelligence)
 - [ ] **Vendor Reviews** - Rate vendors after service calls
 - [ ] **Budget Tracking** - Overall home budget with category breakdown
 
@@ -210,7 +221,7 @@ interface Project {
 3. **Inventory** - Add/edit/delete items, sell workflow, trash/restore
 4. **Maintenance** - Add task, complete with details, skip cycle, view history
 5. **Vendors** - Add vendor, category management, preferred toggle
-6. **Documents** - File upload, OCR text appears in search
+6. **Documents** - File upload, OCR text appears in search, AI extraction button works
 7. **Diagrams** - Create new, add inventory items, save, export PNG
 8. **Home Info** - All tabs save correctly, paint colors, emergency contacts
 9. **Settings** - Theme toggle, data export/import works
@@ -231,6 +242,66 @@ docker build -t hometracker .
 ---
 
 ## 📝 Recent Changes (Last 5 Versions)
+
+### v1.7.0 (2024-12-11)
+- **Document Intelligence** - AI-powered data extraction from documents
+  - `documentExtraction.ts` - Extraction types and parsing utilities
+  - `DocumentExtractionModal.tsx` - Editable extraction results with one-click record creation
+  - Extract vendors, items, receipts, warranties, and maintenance from OCR text
+  - Smart matching suggestions for existing inventory/vendors
+  - Automatic record linking to source documents
+  - Feature toggle `enableDocumentIntelligence` in AI settings
+- **Enhanced Document Store** - Extended with AI extraction fields
+  - `aiExtracted` - Cached extraction results
+  - `linkedRecords` - Track records created from documents
+
+### v1.6.0 (2024-12-11)
+- **AI Core Infrastructure** - Foundation for all AI features
+  - `homeContext.ts` - Aggregates all stores into structured AI context
+  - Enhanced `aiService.ts` with generic `sendPrompt()`, response parsing
+  - `contextToPrompt()` and `contextToCompactJSON()` for AI prompts
+- **Natural Language Search** - Ask questions in GlobalSearch (Ctrl+K)
+  - Detects natural language queries automatically
+  - "Ask AI Assistant" button for intelligent answers
+  - Integrated into existing search modal
+- **AI Query Panel Component** - Reusable chat component
+  - Floating panel on Dashboard (when AI enabled)
+  - Context-aware quick actions per page
+  - Chat history within session
+- **AI Feature Toggles** - Granular control in Settings
+  - Natural Language Search
+  - Document Intelligence
+  - Maintenance Automation
+  - Smart Home Assistant
+  - Assistant Schedule (manual/daily/weekly)
+- **HomeContext Builder** - Full home state for AI
+  - Inventory with warranties, consumables, low stock
+  - Maintenance with overdue, upcoming, by priority
+  - Projects with active, stalled, budget tracking
+  - Vendors with preferred, by category
+  - Summary with needs attention, deadlines
+
+### v1.5.0 (2024-12-10)
+- **AI-Powered Diagram Assistant** - BYOK LLM integration for Mermaid diagrams
+  - Support for OpenAI, Anthropic (Claude), Google Gemini
+  - Chat interface for diagram help and troubleshooting
+  - Quick actions: Fix Errors, Explain, Improve, Create New
+  - Apply generated code directly to editor
+  - API keys stored locally in browser (privacy-first)
+- **Mermaid Diagram Support** - Create diagrams using Mermaid.js syntax
+  - Split-screen code editor with live preview
+  - Syntax error highlighting
+  - Link to Mermaid syntax documentation
+- **Diagram Zoom Controls** - Full zoom functionality
+  - Zoom in/out buttons with percentage display
+  - Fit-to-screen and reset zoom buttons
+  - Mouse wheel zoom in fullscreen mode (Ctrl+Scroll)
+  - Keyboard shortcuts (Ctrl+/-/0)
+- **Enhanced Export Options** - PNG and SVG export for all diagrams
+- **Keyboard Shortcuts Dialog** - Quick reference for all shortcuts
+- **AI Settings in Settings Page** - Centralized AI configuration
+  - Provider selection with model options
+  - Feature toggles for AI capabilities
 
 ### v1.4.0 (2024-12-08)
 - **Inventory Part Storage Location Tracking** - Track where spare parts are stored
@@ -254,10 +325,6 @@ docker build -t hometracker .
 - 7 diagram categories (network, plumbing, electrical, floor-plan, hvac, yard, other)
 - Auto-save, thumbnails, PNG export
 
-### v1.2.1 (2024-12-03)
-- Project subtasks with progress tracking
-- Improved README with screenshots
-
 ---
 
 ## 🔗 Key Files Reference
@@ -270,6 +337,9 @@ docker build -t hometracker .
 | Global CSS | `frontend/src/index.css` |
 | Storage Utils | `frontend/src/lib/storage.ts` |
 | API Client | `frontend/src/lib/api.ts` |
+| AI Service | `frontend/src/lib/aiService.ts` |
+| HomeContext Builder | `frontend/src/lib/homeContext.ts` |
+| AI Settings Store | `frontend/src/store/aiSettingsStore.ts` |
 | Theme Provider | `frontend/src/components/ThemeProvider.tsx` |
 | Backend Entry | `backend/src/index.ts` |
 | Excel Export | `backend/src/services/excel.service.ts` |
@@ -293,6 +363,41 @@ docker build -t hometracker .
 3. **Adding Routes**: Update `App.tsx` routes and `Layout.tsx` navigation
 4. **Adding to Global Search**: Update `GlobalSearch.tsx` PAGES array and search logic
 5. **Excalidraw**: Component needs explicit container dimensions (height/width)
+6. **Adding AI Features**: 
+   - Add feature toggle to `aiSettingsStore.ts` in `AIFeatureToggles`
+   - Add toggle UI in `Settings.tsx` AI Features section
+   - Use `isFeatureEnabled('featureName')` to check if enabled
+   - Use `buildHomeContext()` to get full home state for AI prompts
+   - Use `sendPrompt()` for generic AI calls with optional HomeContext
+
+---
+
+## 🤖 AI Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      AI Feature Layer                        │
+├─────────────┬─────────────┬─────────────┬──────────────────┤
+│ GlobalSearch│ AIQueryPanel│ Mermaid Asst│ Document Intel   │
+│ (NL Search) │ (Dashboard) │ (Diagrams)  │ (Future)         │
+└──────┬──────┴──────┬──────┴──────┬──────┴────────┬─────────┘
+       │             │             │               │
+       └─────────────┴─────────────┴───────────────┘
+                           │
+                    ┌──────▼──────┐
+                    │ aiService.ts │ ← sendPrompt(), parseResponse()
+                    └──────┬──────┘
+                           │
+                    ┌──────▼──────┐
+                    │homeContext.ts│ ← buildHomeContext(), contextToPrompt()
+                    └──────┬──────┘
+                           │
+       ┌───────────────────┼───────────────────┐
+       ▼                   ▼                   ▼
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ OpenAI API  │    │Anthropic API│    │ Gemini API  │
+└─────────────┘    └─────────────┘    └─────────────┘
+```
 
 ---
 

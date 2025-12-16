@@ -22,6 +22,11 @@ const upload = multer({
       'image/webp',
       'image/bmp',
       'image/tiff',
+      // HEIC/HEIF (Apple formats - will be converted to JPEG)
+      'image/heic',
+      'image/heif',
+      'image/heic-sequence',
+      'image/heif-sequence',
       // Documents
       'application/pdf',
       'application/msword',
@@ -32,11 +37,22 @@ const upload = multer({
       'text/csv',
     ];
 
+    // Check by MIME type first
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
-    } else {
-      cb(new Error(`File type ${file.mimetype} is not allowed`));
+      return;
     }
+    
+    // Fallback: check by file extension for HEIC files (browsers may not detect MIME correctly)
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === '.heic' || ext === '.heif') {
+      // Override mimetype for HEIC files
+      file.mimetype = 'image/heic';
+      cb(null, true);
+      return;
+    }
+    
+    cb(new Error(`File type ${file.mimetype} is not allowed`));
   },
 });
 
@@ -293,6 +309,10 @@ router.delete('/:id', (req: Request, res: Response) => {
 });
 
 export default router;
+
+
+
+
 
 
 

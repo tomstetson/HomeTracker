@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import Tesseract from 'tesseract.js';
+import heicConvert from 'heic-convert';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../data');
 const FILES_DIR = path.join(DATA_DIR, 'files');
@@ -64,9 +65,40 @@ const OCR_SUPPORTED_TYPES = [
   'image/tiff',
 ];
 
-// Check if file type supports OCR
+// HEIC/HEIF types that need conversion before OCR
+const HEIC_TYPES = [
+  'image/heic',
+  'image/heif',
+  'image/heic-sequence',
+  'image/heif-sequence',
+];
+
+// Check if file type supports OCR (including HEIC which will be converted)
 function supportsOcr(mimeType: string): boolean {
-  return OCR_SUPPORTED_TYPES.includes(mimeType.toLowerCase());
+  const lower = mimeType.toLowerCase();
+  return OCR_SUPPORTED_TYPES.includes(lower) || HEIC_TYPES.includes(lower);
+}
+
+// Check if file is HEIC/HEIF format
+function isHeicFormat(mimeType: string): boolean {
+  return HEIC_TYPES.includes(mimeType.toLowerCase());
+}
+
+// Convert HEIC to JPEG buffer
+async function convertHeicToJpeg(inputBuffer: Buffer): Promise<Buffer> {
+  console.log('🔄 Converting HEIC to JPEG...');
+  try {
+    const outputBuffer = await heicConvert({
+      buffer: inputBuffer,
+      format: 'JPEG',
+      quality: 0.9,
+    });
+    console.log('✅ HEIC conversion complete');
+    return Buffer.from(outputBuffer);
+  } catch (error) {
+    console.error('❌ HEIC conversion failed:', error);
+    throw error;
+  }
 }
 
 // Perform OCR on an image
@@ -96,22 +128,38 @@ export const fileService = {
     mimeType: string
   ): Promise<StoredFile> {
     const id = uuidv4();
-    const ext = path.extname(originalName) || '.bin';
+    let processedBuffer = buffer;
+    let processedMimeType = mimeType;
+    let ext = path.extname(originalName) || '.bin';
+    
+    // Convert HEIC to JPEG for better compatibility
+    if (isHeicFormat(mimeType)) {
+      try {
+        processedBuffer = await convertHeicToJpeg(buffer);
+        processedMimeType = 'image/jpeg';
+        ext = '.jpg';
+        console.log(`📸 Converted HEIC file: ${originalName} → JPEG`);
+      } catch (error) {
+        console.error(`Failed to convert HEIC file: ${originalName}`, error);
+        // Continue with original file if conversion fails
+      }
+    }
+    
     const filename = `${id}${ext}`;
     const filePath = path.join(FILES_DIR, filename);
 
     // Write file to disk
-    fs.writeFileSync(filePath, buffer);
+    fs.writeFileSync(filePath, processedBuffer);
 
     const fileInfo: StoredFile = {
       id,
       originalName,
       filename,
       path: `/files/${filename}`,
-      mimeType,
-      size: buffer.length,
+      mimeType: processedMimeType,
+      size: processedBuffer.length,
       uploadedAt: new Date().toISOString(),
-      ocrStatus: supportsOcr(mimeType) ? 'pending' : 'not_applicable',
+      ocrStatus: supportsOcr(processedMimeType) ? 'pending' : 'not_applicable',
     };
 
     // Save metadata
@@ -120,7 +168,7 @@ export const fileService = {
     saveMetadata(metadata);
 
     // Start OCR in background if supported
-    if (supportsOcr(mimeType)) {
+    if (supportsOcr(processedMimeType)) {
       this.processOcr(id, filePath).catch(console.error);
     }
 
@@ -254,6 +302,10 @@ export const fileService = {
 };
 
 export default fileService;
+
+
+
+
 
 
 

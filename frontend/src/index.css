@@ -268,3 +268,44 @@ html.dark {
 .tl-watermark {
   display: none !important;
 }
+
+/* Mermaid diagram styles */
+.mermaid-output {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.mermaid-output svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Dark mode mermaid adjustments */
+.dark .mermaid-output {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+.dark .mermaid-output text {
+  fill: currentColor;
+}
+
+/* Mermaid code editor */
+.mermaid-editor textarea {
+  font-family: 'Fira Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+.mermaid-editor textarea::selection {
+  background: hsl(var(--primary) / 0.3);
+}
+
+/* Zoom controls styling */
+.zoom-controls {
+  backdrop-filter: blur(8px);
+  background: hsl(var(--background) / 0.8);
+}

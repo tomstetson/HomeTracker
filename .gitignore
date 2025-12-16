@@ -45,3 +45,7 @@ temp/
 # Misc
 *.bak
 *.orig
+
+# Tesseract OCR training data (large binary file)
+eng.traineddata
+*.traineddata

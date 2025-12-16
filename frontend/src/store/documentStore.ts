@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import { getCollection, saveCollection } from '../lib/storage';
+import { ExtractedData } from '../lib/documentExtraction';
+
+// Record created from document extraction
+export interface DocumentLinkedRecord {
+  type: 'item' | 'vendor' | 'warranty' | 'maintenance';
+  id: string;
+  createdAt: string;
+}
 
 export interface Document {
   id: string;
@@ -7,6 +15,15 @@ export interface Document {
   category: 'manual' | 'receipt' | 'invoice' | 'warranty' | 'photo' | 'other';
   relatedTo?: string; // ID of related item/project/vendor
   relatedType?: 'item' | 'project' | 'vendor' | 'maintenance';
+  // AI Classification metadata
+  aiClassified?: boolean;
+  aiClassifiedAt?: string;
+  classificationConfidence?: number;
+  detectedVendor?: string;
+  detectedDate?: string;
+  suggestedTags?: string[];
+  // Content fingerprint for deduplication
+  contentHash?: string;
   fileType: string; // pdf, jpg, png, etc
   fileSize?: number; // in bytes
   uploadDate: string;
@@ -15,6 +32,11 @@ export interface Document {
   url?: string; // For future file upload
   notes?: string;
   ocrText?: string; // Extracted text from OCR processing
+  
+  // AI extraction fields
+  aiExtracted?: ExtractedData; // Cached extraction results
+  aiExtractedAt?: string; // When extraction was performed
+  linkedRecords?: DocumentLinkedRecord[]; // Records created from this document
 }
 
 const DEFAULT_DOCUMENTS: Document[] = [
@@ -115,7 +137,8 @@ export const useDocumentStore = create<DocumentStore>((set, get) => ({
       (d) =>
         d.name.toLowerCase().includes(lowerQuery) ||
         d.description?.toLowerCase().includes(lowerQuery) ||
-        d.tags?.some((tag) => tag.toLowerCase().includes(lowerQuery))
+        d.tags?.some((tag) => tag.toLowerCase().includes(lowerQuery)) ||
+        d.ocrText?.toLowerCase().includes(lowerQuery)
     );
   },
   

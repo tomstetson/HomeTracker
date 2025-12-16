@@ -46,7 +46,24 @@ export const getAllData = (): StorageData => {
   const data = localStorage.getItem(STORAGE_KEY);
   if (!data) {
     initStorage();
-    return getAllData();
+    const newData = localStorage.getItem(STORAGE_KEY);
+    if (!newData) {
+      // Fallback if still no data
+      return {
+        projects: [],
+        vendors: [],
+        items: [],
+        maintenanceTasks: [],
+        warranties: [],
+        documents: [],
+        categories: [],
+        customOptions: {},
+        homeVitals: {},
+        diagrams: [],
+        lastUpdated: new Date().toISOString(),
+      };
+    }
+    return JSON.parse(newData);
   }
   return JSON.parse(data);
 };
