@@ -22,6 +22,7 @@ import propertyRoutes from './routes/property.routes';
 
 // Import Excel service for graceful shutdown
 import { excelService } from './services/excel.service';
+import { maintenanceChecker } from './services/maintenance-checker.service';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -103,6 +104,9 @@ const server = app.listen(PORT, () => {
   console.log(`🚀 Home Tracker API running on http://localhost:${PORT}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
   console.log(`📊 Excel download: http://localhost:${PORT}/api/excel/download`);
+  
+  // Initialize background jobs
+  maintenanceChecker.init();
 });
 
 // Handle server errors
