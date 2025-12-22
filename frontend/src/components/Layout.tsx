@@ -18,12 +18,52 @@ import {
   Building2,
   PenTool,
   Wallet,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
 import DataManager from './DataManager';
 import GlobalSearch from './GlobalSearch';
 import NotificationPanel from './NotificationPanel';
+
+// Hook to get property info from localStorage
+function usePropertyInfo() {
+  const [propertyInfo, setPropertyInfo] = useState<{ address: string; city: string; state: string } | null>(null);
+
+  useEffect(() => {
+    const loadPropertyInfo = () => {
+      try {
+        const stored = localStorage.getItem('hometracker_settings');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.address || parsed.city) {
+            setPropertyInfo({
+              address: parsed.address || '',
+              city: parsed.city || '',
+              state: parsed.state || '',
+            });
+          } else {
+            setPropertyInfo(null);
+          }
+        }
+      } catch {
+        setPropertyInfo(null);
+      }
+    };
+
+    loadPropertyInfo();
+    // Listen for storage changes
+    window.addEventListener('storage', loadPropertyInfo);
+    // Also check periodically for same-tab updates
+    const interval = setInterval(loadPropertyInfo, 2000);
+    return () => {
+      window.removeEventListener('storage', loadPropertyInfo);
+      clearInterval(interval);
+    };
+  }, []);
+
+  return propertyInfo;
+}
 
 interface LayoutProps {
   children: ReactNode;
@@ -35,6 +75,7 @@ export default function Layout({ children }: LayoutProps) {
   const [isDataManagerOpen, setIsDataManagerOpen] = useState(false);
   const location = useLocation();
   const { resolvedTheme, toggleTheme } = useTheme();
+  const propertyInfo = usePropertyInfo();
   
   // Check for mobile device on mount
   useEffect(() => {
@@ -87,13 +128,40 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Property Info */}
           {!sidebarCollapsed && (
-            <div className="p-3 m-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-lg border border-blue-200 dark:border-blue-700">
-              <p className="text-xs font-semibold text-blue-900 dark:text-blue-300 uppercase tracking-wide mb-1">
-                Property
-              </p>
-              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Your Property</p>
-              <p className="text-xs text-blue-600 dark:text-blue-400">Configure in Settings</p>
-            </div>
+            <Link 
+              to="/home-info"
+              className="block p-3 m-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-lg border border-blue-200 dark:border-blue-700 hover:border-blue-400 dark:hover:border-blue-500 transition-colors group"
+            >
+              {propertyInfo ? (
+                <>
+                  <div className="flex items-center gap-2 mb-1">
+                    <MapPin className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                    <p className="text-xs font-semibold text-blue-900 dark:text-blue-300 uppercase tracking-wide">
+                      My Property
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200 truncate">
+                    {propertyInfo.address || 'Address not set'}
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    {propertyInfo.city}{propertyInfo.city && propertyInfo.state ? ', ' : ''}{propertyInfo.state}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Building2 className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                    <p className="text-xs font-semibold text-blue-900 dark:text-blue-300 uppercase tracking-wide">
+                      Property
+                    </p>
+                  </div>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Set up your home</p>
+                  <p className="text-xs text-blue-500 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                    Click to configure →
+                  </p>
+                </>
+              )}
+            </Link>
           )}
 
           {/* Navigation */}
@@ -190,13 +258,41 @@ export default function Layout({ children }: LayoutProps) {
           </div>
 
           {/* Property Info */}
-          <div className="p-3 m-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-lg border border-blue-200 dark:border-blue-700">
-            <p className="text-xs font-semibold text-blue-900 dark:text-blue-300 uppercase tracking-wide mb-1">
-              Property
-            </p>
-            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Your Property</p>
-            <p className="text-xs text-blue-600 dark:text-blue-400">Configure in Settings</p>
-          </div>
+          <Link 
+            to="/home-info"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="block p-3 m-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-lg border border-blue-200 dark:border-blue-700 hover:border-blue-400 dark:hover:border-blue-500 transition-colors group"
+          >
+            {propertyInfo ? (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <MapPin className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                  <p className="text-xs font-semibold text-blue-900 dark:text-blue-300 uppercase tracking-wide">
+                    My Property
+                  </p>
+                </div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200 truncate">
+                  {propertyInfo.address || 'Address not set'}
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  {propertyInfo.city}{propertyInfo.city && propertyInfo.state ? ', ' : ''}{propertyInfo.state}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <Building2 className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                  <p className="text-xs font-semibold text-blue-900 dark:text-blue-300 uppercase tracking-wide">
+                    Property
+                  </p>
+                </div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Set up your home</p>
+                <p className="text-xs text-blue-500 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                  Click to configure →
+                </p>
+              </>
+            )}
+          </Link>
 
           {/* Navigation */}
           <nav className="flex-1 px-3 mt-4 overflow-y-auto">

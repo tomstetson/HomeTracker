@@ -61,7 +61,7 @@ export default function Dashboard() {
       color: 'from-red-500 to-red-600',
       bgColor: 'bg-red-100 dark:bg-red-900/30',
       textColor: 'text-red-600 dark:text-red-400',
-      href: '/warranties',
+      href: '/items',
     },
     {
       title: 'Total Budget',
@@ -80,7 +80,7 @@ export default function Dashboard() {
     { label: 'Add Item', icon: Package, href: '/items', color: 'blue' },
     { label: 'New Project', icon: FolderKanban, href: '/projects', color: 'purple' },
     { label: 'Schedule Maintenance', icon: Wrench, href: '/maintenance', color: 'orange' },
-    { label: 'Add Warranty', icon: Shield, href: '/warranties', color: 'emerald' },
+    { label: 'Add Warranty', icon: Shield, href: '/items', color: 'emerald' },
   ];
 
   const actionColors = {
