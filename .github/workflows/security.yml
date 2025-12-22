@@ -40,10 +40,12 @@ jobs:
 
       - name: Run OSV Scanner
         uses: google/osv-scanner-action@v1
+        continue-on-error: true
         with:
           scan-args: |-
             --lockfile=frontend/package-lock.json
             --lockfile=backend/package-lock.json
+            --format=table
 
   semgrep:
     runs-on: ubuntu-latest

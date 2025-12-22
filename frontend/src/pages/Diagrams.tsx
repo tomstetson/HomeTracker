@@ -118,6 +118,56 @@ const MERMAID_EXAMPLES: Record<string, string> = {
     C --> D[Box D]`,
 };
 
+// Migrate tldraw data to handle schema changes between versions
+const migrateTldrawData = (data: any): any => {
+  if (!data || !data.store) return data;
+  
+  try {
+    const migratedStore: Record<string, any> = {};
+    
+    for (const [key, record] of Object.entries(data.store as Record<string, any>)) {
+      // Skip non-shape records
+      if (!key.startsWith('shape:')) {
+        migratedStore[key] = record;
+        continue;
+      }
+      
+      const shape = record as any;
+      
+      // Fix text shape props - remove 'text' from props if it exists on text shapes
+      // In newer tldraw, text shapes use different prop structure
+      if (shape.type === 'text' && shape.props) {
+        const { text, ...restProps } = shape.props;
+        // If text prop exists at shape level, keep it there, remove from props
+        if (text !== undefined) {
+          migratedStore[key] = {
+            ...shape,
+            props: restProps,
+          };
+          continue;
+        }
+      }
+      
+      // Fix geo shape props that might have incompatible text property
+      if (shape.type === 'geo' && shape.props?.text !== undefined) {
+        // geo shapes can have text, but ensure it's properly formatted
+        migratedStore[key] = shape;
+        continue;
+      }
+      
+      migratedStore[key] = shape;
+    }
+    
+    return {
+      ...data,
+      store: migratedStore,
+    };
+  } catch (e) {
+    console.error('Migration failed:', e);
+    return null; // Return null to indicate migration failed, start fresh
+  }
+};
+
 // Keyboard shortcuts
 const KEYBOARD_SHORTCUTS = [
   { key: 'Ctrl + S', action: 'Save diagram' },
@@ -1069,9 +1119,15 @@ export default function Diagrams() {
                 editorRef.current = editor;
                 if (activeDiagram.data && activeDiagram.data.type !== 'mermaid') {
                   try {
-                    editor.store.loadSnapshot(activeDiagram.data);
+                    // Migrate old tldraw data format to new format
+                    const migratedData = migrateTldrawData(activeDiagram.data);
+                    if (migratedData) {
+                      editor.store.loadSnapshot(migratedData);
+                    }
                   } catch (e) {
-                    console.warn('Failed to load diagram:', e);
+                    console.warn('Failed to load diagram, starting fresh:', e);
+                    // Clear corrupted data and start fresh
+                    toast.warning('Data Migration', 'Diagram data was incompatible and has been reset');
                   }
                 }
                 editor.store.listen(() => setHasUnsavedChanges(true), { scope: 'document' });

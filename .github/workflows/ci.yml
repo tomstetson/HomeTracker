@@ -105,4 +105,4 @@ jobs:
         run: npm install -g @secretlint/quick-start
 
       - name: Run secretlint
-        run: npx secretlint "backend/src/**/*" "frontend/src/**/*"
+        run: npx secretlint --secretlintrc .secretlintrc.json "backend/src/**/*" "frontend/src/**/*"
