@@ -24,11 +24,18 @@ services:
     volumes:
       # Persistent data storage - CRITICAL for not losing data
       - ./data:/app/backend/data
+      # Images and thumbnails
+      - ./data/images:/app/backend/data/images
+      - ./data/thumbnails:/app/backend/data/thumbnails
       # Optional: Mount for backups
       - ./backups:/app/backups
     environment:
       - NODE_ENV=production
       - TZ=America/New_York
+      # AI API Keys (optional - can also be set via UI)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/health"]
       interval: 30s
@@ -36,14 +43,15 @@ services:
       retries: 3
       start_period: 30s
     # Resource limits for homelab efficiency
+    # Increased for image processing and AI batch jobs
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '2.0'
+          memory: 2G
         reservations:
-          cpus: '0.1'
-          memory: 128M
+          cpus: '0.25'
+          memory: 256M
     logging:
       driver: "json-file"
       options:

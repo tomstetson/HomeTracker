@@ -21,10 +21,13 @@ import fileRoutes from './routes/file.routes';
 import propertyRoutes from './routes/property.routes';
 import syncRoutes from './routes/sync.routes';
 import authRoutes from './routes/auth.routes';
+import imagesRoutes from './routes/images.routes';
+import aiJobsRoutes from './routes/ai-jobs.routes';
 
 // Import Excel service for graceful shutdown
 import { excelService } from './services/excel.service';
 import { maintenanceChecker } from './services/maintenance-checker.service';
+import { databaseService } from './services/database.service';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -62,6 +65,8 @@ app.use('/api/files', fileRoutes);
 app.use('/api/property', propertyRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/images', imagesRoutes);
+app.use('/api/ai-jobs', aiJobsRoutes);
 
 // Settings routes
 app.get('/api/settings', (req: Request, res: Response) => {
@@ -92,6 +97,7 @@ const shutdown = async (signal: string) => {
   console.log(`\n${signal} received. Saving data before shutdown...`);
   try {
     await excelService.forceSave();
+    databaseService.close();
     console.log('✅ Data saved successfully');
     process.exit(0);
   } catch (error) {
@@ -108,6 +114,8 @@ const server = app.listen(PORT, () => {
   console.log(`🚀 Home Tracker API running on http://localhost:${PORT}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
   console.log(`📊 Excel download: http://localhost:${PORT}/api/excel/download`);
+  console.log(`🖼️  Image upload: http://localhost:${PORT}/api/images/upload`);
+  console.log(`🤖 AI Jobs: http://localhost:${PORT}/api/ai-jobs`);
   
   // Initialize background jobs
   maintenanceChecker.init();
