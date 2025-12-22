@@ -1,5 +1,6 @@
 // LocalStorage Database Layer
 // This provides persistence for all app data
+// Demo data is centralized in ./demoData.ts
 
 const STORAGE_KEY = 'hometracker_data';
 const VERSION = '1.0';
@@ -23,29 +24,42 @@ export interface StorageData {
   budgets?: any[];
 }
 
-// Initialize storage with default data
+// Default empty data structure (demo data loaded separately via demoData.ts)
+const getEmptyData = (): StorageData => ({
+  version: VERSION,
+  lastUpdated: new Date().toISOString(),
+  items: [],
+  vendors: [],
+  projects: [],
+  maintenanceTasks: [],
+  warranties: [],
+  documents: [],
+  categories: [
+    'Kitchen Appliances',
+    'Laundry',
+    'HVAC',
+    'Electronics',
+    'Furniture',
+    'Tools',
+    'Outdoor/Garden',
+    'Lighting',
+    'Plumbing',
+    'Security',
+  ],
+  customOptions: {},
+  homeVitals: {},
+  diagrams: [],
+  aiSettings: {},
+  inventoryStaging: {},
+  transactions: [],
+  budgets: [],
+});
+
+// Initialize storage with empty data (demo data loaded separately)
 export const initStorage = () => {
   const existing = localStorage.getItem(STORAGE_KEY);
   if (!existing) {
-    const defaultData: StorageData = {
-      version: VERSION,
-      lastUpdated: new Date().toISOString(),
-      items: [],
-      vendors: [],
-      projects: [],
-      maintenanceTasks: [],
-      warranties: [],
-      documents: [],
-      categories: [],
-      customOptions: {},
-      homeVitals: {},
-      diagrams: [],
-      aiSettings: {},
-      inventoryStaging: {},
-      transactions: [],
-      budgets: []
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(getEmptyData()));
   }
 };
 

@@ -3,10 +3,12 @@ import { Button } from './ui/Button';
 import { Dialog, DialogFooter } from './ui/Dialog';
 import { useToast } from './ui/Toast';
 import { exportData, importData, clearAllData } from '../lib/storage';
+import { initializeDemoData } from '../lib/demoData';
 import { dataSyncService, useDataSync } from '../lib/dataSync';
 import { 
   Download, Upload, Trash2, AlertTriangle, 
-  Cloud, CloudOff, RefreshCw, FileSpreadsheet 
+  Cloud, CloudOff, RefreshCw, FileSpreadsheet,
+  Database
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -18,6 +20,7 @@ interface DataManagerProps {
 export default function DataManager({ isOpen, onClose }: DataManagerProps) {
   const toast = useToast();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showDemoConfirm, setShowDemoConfirm] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const { status, checkConnection } = useDataSync();
 
@@ -117,6 +120,19 @@ export default function DataManager({ isOpen, onClose }: DataManagerProps) {
     } catch (error) {
       toast.error('Clear Failed', 'Failed to clear data');
       console.error('Clear error:', error);
+    }
+  };
+
+  const handleLoadDemoData = () => {
+    try {
+      initializeDemoData();
+      toast.success('Demo Data Loaded', 'Sample data has been loaded. Refreshing...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      toast.error('Load Failed', 'Failed to load demo data');
+      console.error('Demo data error:', error);
     }
   };
 
@@ -273,6 +289,33 @@ export default function DataManager({ isOpen, onClose }: DataManagerProps) {
             </div>
           </div>
 
+          <hr className="border-border" />
+
+          {/* Load Demo Data */}
+          <div className="p-4 border border-purple-500/30 bg-purple-500/5 rounded-lg">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Database className="w-5 h-5 text-purple-500" />
+                  <h3 className="font-semibold text-purple-700 dark:text-purple-300">Load Demo Data</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Replace all data with sample demo data for testing. Includes sample vendors,
+                  projects, inventory items, maintenance tasks, and diagrams.
+                </p>
+              </div>
+              <Button
+                onClick={() => setShowDemoConfirm(true)}
+                variant="outline"
+                size="sm"
+                className="ml-4 border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+              >
+                <Database className="w-4 h-4 mr-2" />
+                Load Demo
+              </Button>
+            </div>
+          </div>
+
           {/* Clear */}
           <div className="p-4 border border-destructive/30 bg-destructive/5 rounded-lg">
             <div className="flex items-start justify-between">
@@ -346,6 +389,51 @@ export default function DataManager({ isOpen, onClose }: DataManagerProps) {
           >
             <Trash2 className="w-4 h-4 mr-2" />
             Yes, Clear Everything
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Demo Data Confirmation Dialog */}
+      <Dialog
+        open={showDemoConfirm}
+        onClose={() => setShowDemoConfirm(false)}
+        title="Load Demo Data"
+        description="Replace current data with sample data?"
+        maxWidth="sm"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center space-x-3 p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+            <Database className="w-6 h-6 text-purple-500 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-foreground">This will replace all data with:</p>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                <li>4 sample vendors</li>
+                <li>2 projects with subtasks</li>
+                <li>4 inventory items with warranties</li>
+                <li>4 maintenance tasks</li>
+                <li>2 sample diagrams</li>
+                <li>Sample budgets & transactions</li>
+              </ul>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Your current data will be replaced. Export first if you want to keep it.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowDemoConfirm(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              handleLoadDemoData();
+              setShowDemoConfirm(false);
+              onClose();
+            }}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            <Database className="w-4 h-4 mr-2" />
+            Load Demo Data
           </Button>
         </DialogFooter>
       </Dialog>
