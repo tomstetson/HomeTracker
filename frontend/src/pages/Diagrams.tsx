@@ -118,53 +118,28 @@ const MERMAID_EXAMPLES: Record<string, string> = {
     C --> D[Box D]`,
 };
 
-// Migrate tldraw data to handle schema changes between versions
-const migrateTldrawData = (data: any): any => {
-  if (!data || !data.store) return data;
+// Check if tldraw data is compatible with current version
+// Returns true if data can be loaded, false if it should be discarded
+const isValidTldrawData = (data: any): boolean => {
+  if (!data || !data.store) return false;
   
   try {
-    const migratedStore: Record<string, any> = {};
-    
+    // Check for incompatible shape properties that cause ValidationError
     for (const [key, record] of Object.entries(data.store as Record<string, any>)) {
-      // Skip non-shape records
-      if (!key.startsWith('shape:')) {
-        migratedStore[key] = record;
-        continue;
-      }
+      if (!key.startsWith('shape:')) continue;
       
       const shape = record as any;
       
-      // Fix text shape props - remove 'text' from props if it exists on text shapes
-      // In newer tldraw, text shapes use different prop structure
-      if (shape.type === 'text' && shape.props) {
-        const { text, ...restProps } = shape.props;
-        // If text prop exists at shape level, keep it there, remove from props
-        if (text !== undefined) {
-          migratedStore[key] = {
-            ...shape,
-            props: restProps,
-          };
-          continue;
-        }
+      // Text shapes with 'text' in props are incompatible with newer tldraw
+      if (shape.type === 'text' && shape.props?.text !== undefined) {
+        console.warn('Found incompatible text shape, data needs reset');
+        return false;
       }
-      
-      // Fix geo shape props that might have incompatible text property
-      if (shape.type === 'geo' && shape.props?.text !== undefined) {
-        // geo shapes can have text, but ensure it's properly formatted
-        migratedStore[key] = shape;
-        continue;
-      }
-      
-      migratedStore[key] = shape;
     }
-    
-    return {
-      ...data,
-      store: migratedStore,
-    };
+    return true;
   } catch (e) {
-    console.error('Migration failed:', e);
-    return null; // Return null to indicate migration failed, start fresh
+    console.error('Validation check failed:', e);
+    return false;
   }
 };
 
@@ -341,6 +316,7 @@ export default function Diagrams() {
   };
 
   // Apply template to canvas
+  // Note: tldraw v3 changed text shape props - we use geo shapes with labels instead
   const applyTemplate = (template: DiagramTemplate) => {
     if (!editorRef.current) return;
     const editor = editorRef.current;
@@ -355,19 +331,19 @@ export default function Diagrams() {
             geo: 'rectangle',
             w: shape.width || 100,
             h: shape.height || 60,
-            text: shape.text || '',
             fill: 'solid',
             color: 'light-blue',
           },
         });
       } else if (shape.type === 'text') {
+        // Use note shape for text labels - compatible with tldraw v3
         editor.createShape({
-          type: 'text',
+          type: 'note',
           x: shape.x,
           y: shape.y,
           props: {
-            text: shape.text || '',
             size: shape.props?.size || 'm',
+            color: 'yellow',
           },
         });
       } else if (shape.type === 'ellipse') {
@@ -379,7 +355,6 @@ export default function Diagrams() {
             geo: 'ellipse',
             w: shape.width || 60,
             h: shape.height || 60,
-            text: shape.text || '',
             fill: 'solid',
           },
         });
@@ -1118,16 +1093,22 @@ export default function Diagrams() {
               onMount={(editor) => {
                 editorRef.current = editor;
                 if (activeDiagram.data && activeDiagram.data.type !== 'mermaid') {
-                  try {
-                    // Migrate old tldraw data format to new format
-                    const migratedData = migrateTldrawData(activeDiagram.data);
-                    if (migratedData) {
-                      editor.store.loadSnapshot(migratedData);
+                  // Validate data before loading - if incompatible, start fresh
+                  if (isValidTldrawData(activeDiagram.data)) {
+                    try {
+                      editor.store.loadSnapshot(activeDiagram.data);
+                    } catch (e) {
+                      console.warn('Failed to load diagram, starting fresh:', e);
+                      toast.warning('Data Reset', 'Diagram data was corrupted and has been reset');
+                      // Clear the corrupted data from storage
+                      updateDiagram(activeDiagram.id, { data: null });
                     }
-                  } catch (e) {
-                    console.warn('Failed to load diagram, starting fresh:', e);
-                    // Clear corrupted data and start fresh
-                    toast.warning('Data Migration', 'Diagram data was incompatible and has been reset');
+                  } else {
+                    // Data is incompatible with current tldraw version
+                    console.warn('Incompatible diagram data detected, starting fresh');
+                    toast.info('Data Reset', 'Diagram format updated - starting with fresh canvas');
+                    // Clear the incompatible data from storage
+                    updateDiagram(activeDiagram.id, { data: null });
                   }
                 }
                 editor.store.listen(() => setHasUnsavedChanges(true), { scope: 'document' });
