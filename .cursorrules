@@ -1,0 +1,103 @@
+# HomeTracker - Cursor AI Rules
+
+## Project Context
+HomeTracker is a self-hosted home management app for homelabbers. Single-user, privacy-first, Docker-deployed.
+
+## Tech Stack
+- Frontend: React 18 + TypeScript + Vite 7 + Tailwind CSS + Zustand
+- Backend: Node.js 20 + Express.js + ExcelJS (JSON + Excel storage)
+- Diagrams: tldraw + Mermaid.js
+- AI: BYOK (OpenAI, Anthropic, Gemini)
+
+## Code Style
+
+### TypeScript
+- Use strict TypeScript, avoid `any` unless absolutely necessary
+- Prefer interfaces over types for object shapes
+- Use Zod for runtime validation where needed
+
+### React
+- Functional components only, no class components
+- Use Zustand for global state (stores in `frontend/src/store/`)
+- Custom hooks for reusable logic
+- Tailwind CSS for styling, no CSS modules
+- Use Lucide React for icons
+
+### File Organization
+- Pages in `frontend/src/pages/` - one file per route
+- Components in `frontend/src/components/` - reusable UI
+- Stores in `frontend/src/store/` - Zustand with localStorage persistence
+- Utilities in `frontend/src/lib/` - pure functions, services
+
+### Backend
+- Express routes in `backend/src/routes/` - REST endpoints
+- Services in `backend/src/services/` - business logic
+- JSON file storage via `excel.service.ts`
+
+## Important Patterns
+
+### State Persistence
+All Zustand stores auto-save to localStorage via `storage.ts`:
+```typescript
+import { saveData, loadData } from '../lib/storage';
+// Use persist middleware with custom storage
+```
+
+### AI Features
+- Check `isFeatureEnabled('featureName')` before AI calls
+- Use `buildHomeContext()` for full home state
+- Use `sendPrompt()` for LLM calls
+
+### Adding New Features
+1. Create/update Zustand store
+2. Add UI in pages/components
+3. Add route to `App.tsx` and `Layout.tsx` nav
+4. Update `GlobalSearch.tsx` for searchability
+
+## Security Requirements
+- No hardcoded secrets - use environment variables
+- Sanitize HTML with DOMPurify before `dangerouslySetInnerHTML`
+- Run `npm run lint` for security checks
+- All API keys stored in localStorage (BYOK model)
+
+## Testing
+- Tests in `*.test.ts` or `*.test.tsx` files
+- Use Vitest + Testing Library
+- Mock Zustand stores with `vi.mock()`
+- Run: `cd frontend && npm test`
+
+## Common Commands
+```bash
+# Development
+cd frontend && npm run dev
+cd backend && npm run dev
+
+# Testing
+cd frontend && npm test
+cd frontend && npm run test:ui
+
+# Security
+.\scripts\security-audit.ps1
+npm run lint
+
+# Docker
+docker-compose up -d
+```
+
+## Files to Reference
+- `CLAUDE.md` - Full project documentation
+- `docs/V1_ROADMAP.md` - Feature roadmap
+- `frontend/src/lib/homeContext.ts` - AI context builder
+- `frontend/src/lib/aiService.ts` - LLM integration
+
+## Known Issues
+- React Router v7 deprecation warnings (cosmetic)
+- Large bundle due to tldraw (~2MB) - expected
+- Frontend works offline with localStorage
+
+## Do NOT
+- Add new npm dependencies without justification
+- Use `eval()`, `innerHTML`, or `new Function()`
+- Store secrets in code
+- Skip TypeScript types
+- Use CSS-in-JS (use Tailwind)

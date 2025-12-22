@@ -2,21 +2,22 @@
 
 > **Purpose**: This file provides continuity for AI coding assistants (Claude Code, Cursor, Windsurf, etc.) to understand the project's current state, implemented features, and future roadmap.
 > 
-> **Last Updated**: 2024-12-21 | **Version**: 1.7.1
+> **Last Updated**: 2024-12-21 | **Version**: 1.8.0
 
 ---
 
 ## 🏠 Project Overview
 
-**HomeTracker** is a self-hosted home management application designed for homelabbers. It provides a single source of truth for tracking all aspects of home ownership including projects, inventory, maintenance, warranties, vendors, documents, and diagrams.
+**HomeTracker** is a self-hosted home management application designed for homelabbers. It provides a single source of truth for tracking all aspects of home ownership including projects, inventory, maintenance, warranties, vendors, documents, diagrams, and budgets.
 
 ### Tech Stack
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Zustand (state management)
-- **Backend**: Node.js, Express.js, ExcelJS
+- **Frontend**: React 18, TypeScript, Vite 7, Tailwind CSS, Zustand (state management)
+- **Backend**: Node.js 20, Express.js, ExcelJS
 - **Storage**: JSON files + Excel export (hometracker.xlsx)
-- **Deployment**: Docker, Nginx, Supervisor
-- **Special Libraries**: tldraw (diagrams), mermaid (code diagrams), Tesseract.js (OCR)
+- **Deployment**: Docker (multi-stage build), Nginx, Supervisor
+- **Special Libraries**: tldraw (diagrams), mermaid (code diagrams), Tesseract.js (OCR), DOMPurify (XSS protection)
 - **AI Integration**: BYOK (Bring Your Own Key) support for OpenAI, Anthropic (Claude), Google Gemini
+- **Security**: ESLint security plugin, Secretlint, OSV Scanner, Semgrep (CI), Gitleaks, Trivy
 
 ### Key Directories
 ```
@@ -24,20 +25,49 @@ HomeTracker/
 ├── frontend/              # React frontend application
 │   ├── src/
 │   │   ├── components/    # Reusable UI components
-│   │   ├── pages/         # Main page components
-│   │   ├── store/         # Zustand stores (state management)
-│   │   └── lib/           # Utilities, storage, API helpers
+│   │   ├── pages/         # Main page components (11 pages)
+│   │   ├── store/         # Zustand stores (14 stores)
+│   │   ├── lib/           # Utilities, services, API helpers
+│   │   └── test/          # Test setup and utilities
 ├── backend/               # Express.js backend
 │   ├── src/
-│   │   ├── services/      # Business logic (excel, file, sync)
-│   │   └── routes/        # API routes
-├── docs/                  # Documentation
-└── docker/                # Docker configs, backup scripts
+│   │   ├── services/      # Business logic (excel, file, email, maintenance-checker)
+│   │   └── routes/        # API routes (12 route files)
+├── docs/                  # Documentation (7 docs)
+├── docker/                # Docker configs, nginx, supervisor
+├── scripts/               # PowerShell scripts (security-audit)
+└── .github/workflows/     # CI/CD (ci.yml, security.yml)
 ```
 
 ---
 
-## ✅ Implemented Features (v1.7.1)
+## 🔒 Security Infrastructure
+
+### Local Security Tools
+| Tool | Purpose | Command |
+|------|---------|---------|
+| **npm audit** | Dependency vulnerabilities | `npm audit` |
+| **OSV Scanner** | Google's vulnerability DB | `osv-scanner --lockfile package-lock.json` |
+| **Secretlint** | Secret detection | `npx secretlint "src/**/*"` |
+| **ESLint Security** | Code security patterns | `npm run lint` |
+
+### CI/CD Security (GitHub Actions)
+- **security.yml**: OSV Scanner, Semgrep, Trivy, Gitleaks, npm audit
+- **ci.yml**: Tests, linting, secretlint, builds
+
+### Pre-commit Hooks (Husky + lint-staged)
+- Secretlint on all staged files
+- npm audit on backend/frontend changes
+
+### Running Full Security Audit
+```powershell
+.\scripts\security-audit.ps1        # Full audit
+.\scripts\security-audit.ps1 -Fix   # Auto-fix npm vulnerabilities
+```
+
+---
+
+## ✅ Implemented Features (v1.8.0)
 
 ### Core Modules
 
@@ -405,6 +435,60 @@ docker build -t hometracker .
 │ OpenAI API  │    │Anthropic API│    │ Gemini API  │
 └─────────────┘    └─────────────┘    └─────────────┘
 ```
+
+---
+
+---
+
+## 🧹 Local Development
+
+### Quick Start
+```bash
+# Install dependencies
+cd frontend && npm install
+cd ../backend && npm install
+
+# Start development servers
+cd backend && npm run dev    # Backend on :3001
+cd frontend && npm run dev   # Frontend on :5173 (proxies /api to :3001)
+```
+
+### Docker Development
+```bash
+# Full production build
+docker-compose up -d
+
+# Development (backend in Docker, frontend local)
+docker-compose -f docker-compose.dev.yml up -d
+cd frontend && npm run dev
+```
+
+### Running Tests
+```bash
+cd frontend && npm test           # Run all tests
+cd frontend && npm run test:ui    # Vitest UI
+cd frontend && npm run test:coverage
+```
+
+---
+
+## 📦 Dependency Notes
+
+### Frontend Heavy Dependencies
+| Package | Size | Purpose | Required |
+|---------|------|---------|----------|
+| `tldraw` | ~2MB | Diagram editor | Yes - core feature |
+| `mermaid` | ~1MB | Code diagrams | Yes - core feature |
+| `recharts` | ~500KB | Charts/graphs | Yes - dashboard/budget |
+| `framer-motion` | ~150KB | Animations | Optional - can remove |
+
+### Backend Notes
+| Package | Purpose | Status |
+|---------|---------|--------|
+| `@prisma/client` | Database ORM | **UNUSED** - Remove |
+| `passport`, `passport-jwt`, `bcrypt`, `jsonwebtoken` | Auth | Mock only - keep for future |
+| `tesseract.js` | OCR | Required - documents |
+| `heic-convert` | iOS photos | Required - file uploads |
 
 ---
 
