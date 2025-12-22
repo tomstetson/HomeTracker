@@ -3,6 +3,24 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Heavy diagram libraries - lazy loaded
+          'vendor-tldraw': ['tldraw'],
+          'vendor-mermaid': ['mermaid'],
+          // Charts for dashboard
+          'vendor-charts': ['recharts'],
+          // Core React libraries
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // UI utilities
+          'vendor-ui': ['lucide-react', 'clsx', 'tailwind-merge', 'class-variance-authority'],
+        }
+      }
+    },
+    chunkSizeWarningLimit: 600,
+  },
   plugins: [
     react(),
     VitePWA({

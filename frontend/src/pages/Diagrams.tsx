@@ -1,8 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Tldraw, Editor, exportToBlob } from 'tldraw';
-import 'tldraw/tldraw.css';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import type { Editor } from 'tldraw';
+import { exportToBlob } from 'tldraw';
 import mermaid from 'mermaid';
 import DOMPurify from 'dompurify';
+import DiagramEditorSkeleton from '../components/DiagramEditorSkeleton';
+
+// Lazy load tldraw editor to reduce initial bundle size (~1.2MB)
+const TldrawEditor = lazy(() => import('../components/TldrawEditor'));
+
+// Initialize mermaid (mermaid is smaller and needed for preview, so keep sync import)
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'default',
+  securityLevel: 'loose',
+  flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+});
 import { useDiagramStore, Diagram, DIAGRAM_CATEGORIES } from '../store/diagramStore';
 import { useInventoryStore } from '../store/inventoryStore';
 import { Card, CardContent } from '../components/ui/Card';
@@ -48,17 +60,7 @@ import { cn } from '../lib/utils';
 type ViewMode = 'gallery' | 'editor' | 'mermaid-editor';
 type EditorPanel = 'shapes' | 'templates' | 'inventory' | null;
 
-// Initialize mermaid
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-  flowchart: {
-    useMaxWidth: true,
-    htmlLabels: true,
-    curve: 'basis',
-  },
-});
+// Mermaid is now initialized in MermaidRenderer component
 
 // Default Mermaid examples for each diagram type
 const MERMAID_EXAMPLES: Record<string, string> = {
@@ -1087,40 +1089,23 @@ export default function Diagrams() {
             </div>
           )}
 
-          {/* Canvas */}
+          {/* Canvas - Lazy loaded */}
           <div className="flex-1 relative bg-white">
-            <Tldraw
-              onMount={(editor) => {
-                editorRef.current = editor;
-                if (activeDiagram.data && activeDiagram.data.type !== 'mermaid') {
-                  // Validate data before loading - if incompatible, start fresh
-                  if (isValidTldrawData(activeDiagram.data)) {
-                    try {
-                      editor.store.loadSnapshot(activeDiagram.data);
-                    } catch (e) {
-                      console.warn('Failed to load diagram, starting fresh:', e);
-                      toast.warning('Data Reset', 'Diagram data was corrupted and has been reset');
-                      // Clear the corrupted data from storage
-                      updateDiagram(activeDiagram.id, { data: null });
-                    }
-                  } else {
-                    // Data is incompatible with current tldraw version
-                    console.warn('Incompatible diagram data detected, starting fresh');
+            <Suspense fallback={<DiagramEditorSkeleton type="tldraw" />}>
+              <TldrawEditor
+                initialData={activeDiagram.data}
+                onMount={(editor) => {
+                  editorRef.current = editor;
+                  if (activeDiagram.data && !isValidTldrawData(activeDiagram.data)) {
                     toast.info('Data Reset', 'Diagram format updated - starting with fresh canvas');
-                    // Clear the incompatible data from storage
                     updateDiagram(activeDiagram.id, { data: null });
                   }
-                }
-                editor.store.listen(() => setHasUnsavedChanges(true), { scope: 'document' });
-                // Update zoom level
-                setZoomLevel(Math.round(editor.getZoomLevel() * 100));
-                
-                // Listen for zoom changes
-                editor.store.listen(() => {
-                  setZoomLevel(Math.round(editor.getZoomLevel() * 100));
-                }, { scope: 'session' });
-              }}
-            />
+                }}
+                onChange={() => setHasUnsavedChanges(true)}
+                onZoomChange={setZoomLevel}
+                className="w-full h-full"
+              />
+            </Suspense>
             
             {/* Fullscreen zoom hint */}
             {isFullscreen && (
