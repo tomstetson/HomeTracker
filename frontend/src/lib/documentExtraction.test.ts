@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { suggestDocumentLinks, DocumentLinkSuggestion } from './documentExtraction';
+import { suggestDocumentLinks } from './documentExtraction';
 
 describe('Document Extraction', () => {
   describe('suggestDocumentLinks', () => {

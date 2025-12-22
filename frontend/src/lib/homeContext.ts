@@ -4,9 +4,9 @@
  * Used by AI features to understand the current state of the home
  */
 
-import { useInventoryStore, InventoryItem, ConsumableInfo } from '../store/inventoryStore';
+import { useInventoryStore, InventoryItem } from '../store/inventoryStore';
 import { useMaintenanceStore, MaintenanceTask } from '../store/maintenanceStore';
-import { useProjectStore, Project, Subtask } from '../store/projectStore';
+import { useProjectStore, Project } from '../store/projectStore';
 import { useVendorStore, Vendor } from '../store/vendorStore';
 import { useDocumentStore, Document } from '../store/documentStore';
 import { useHomeVitalsStore, HomeVitals, PaintColor, HomeValue, ServiceRecord } from '../store/homeVitalsStore';

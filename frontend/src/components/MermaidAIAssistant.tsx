@@ -17,7 +17,6 @@ import {
   Sparkles,
   Wrench,
   Lightbulb,
-  FileText,
   Wand2,
   Settings,
   ChevronDown,
@@ -25,9 +24,7 @@ import {
   Copy,
   Check,
   Loader2,
-  X,
   MessageSquare,
-  AlertCircle,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -78,7 +75,7 @@ export function MermaidAIAssistant({
   }, [inputValue]);
 
   const addMessage = (role: 'user' | 'assistant', content: string) => {
-    const extractedCode = role === 'assistant' ? extractMermaidCode(content) : undefined;
+    const extractedCode = role === 'assistant' ? (extractMermaidCode(content) ?? undefined) : undefined;
     const newMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
       role,

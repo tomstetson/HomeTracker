@@ -6,8 +6,9 @@
     "security:audit": "powershell -ExecutionPolicy Bypass -File ./scripts/security-audit.ps1"
   },
   "devDependencies": {
+    "@secretlint/quick-start": "^8.0.0",
+    "@secretlint/secretlint-rule-pattern": "^11.2.5",
     "husky": "^9.0.0",
-    "lint-staged": "^15.0.0",
-    "@secretlint/quick-start": "^8.0.0"
+    "lint-staged": "^15.0.0"
   }
 }

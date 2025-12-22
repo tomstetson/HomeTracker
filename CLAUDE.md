@@ -2,7 +2,7 @@
 
 > **Purpose**: This file provides continuity for AI coding assistants (Claude Code, Cursor, Windsurf, etc.) to understand the project's current state, implemented features, and future roadmap.
 > 
-> **Last Updated**: 2024-12-11 | **Version**: 1.7.0
+> **Last Updated**: 2024-12-21 | **Version**: 1.7.1
 
 ---
 
@@ -37,7 +37,7 @@ HomeTracker/
 
 ---
 
-## ✅ Implemented Features (v1.3.2)
+## ✅ Implemented Features (v1.7.1)
 
 ### Core Modules
 
@@ -46,12 +46,14 @@ HomeTracker/
 | **Dashboard** | `pages/Dashboard.tsx` | Stats cards, quick actions, recent projects, needs attention |
 | **Projects** | `pages/Projects.tsx` | Kanban board (5 columns), drag-drop, subtasks, tags, budgets, mobile list view |
 | **Inventory** | `pages/Items.tsx` | Items with warranties, categories, sell tracking, soft delete/trash (180-day retention) |
+| **Inventory Wizard** | `pages/InventoryWizard.tsx` | Step-by-step guided inventory creation |
 | **Maintenance** | `pages/Maintenance.tsx` | Tasks/History tabs, list/card views, recurring tasks, skip cycle, undo complete |
 | **Vendors** | `pages/Vendors.tsx` | Vendor directory with ratings, custom categories, preferred filter |
-| **Documents** | `pages/Documents.tsx` | File upload, OCR text extraction, category filtering |
+| **Documents** | `pages/Documents.tsx` | File upload, OCR text extraction, category filtering, AI extraction |
 | **Diagrams** | `pages/Diagrams.tsx` | tldraw editor, Mermaid code diagrams, zoom controls, PNG/SVG export, inventory integration, 7 diagram types, keyboard shortcuts |
 | **Home Info** | `pages/HomeInfo.tsx` | Property details, value tracking, paint colors, emergency contacts |
-| **Settings** | `pages/Settings.tsx` | Theme toggle, API privacy, data export/import, backup |
+| **Budget** | `pages/Budget.tsx` | Transaction tracking, income/expenses, category budgets, analytics, recurring transactions |
+| **Settings** | `pages/Settings.tsx` | Theme toggle, API privacy, data export/import, backup, notification preferences |
 
 ### State Management (Zustand Stores)
 
@@ -67,6 +69,9 @@ HomeTracker/
 | `useOptionsStore` | `store/optionsStore.ts` | User-customizable dropdown options |
 | `useWarrantyStore` | `store/warrantyStore.ts` | Standalone warranties (legacy) |
 | `useAISettingsStore` | `store/aiSettingsStore.ts` | AI provider config, BYOK API keys |
+| `useBudgetStore` | `store/budgetStore.ts` | Transactions, budgets, analytics |
+| `useNotificationStore` | `store/notificationStore.ts` | In-app notifications, preferences |
+| `usePropertyValueStore` | `store/propertyValueStore.ts` | Home value history tracking |
 
 ### UI Components
 
@@ -94,7 +99,9 @@ HomeTracker/
 |---------|------|---------|
 | `excel.service.ts` | `backend/src/services/` | Real-time Excel export |
 | `file.service.ts` | `backend/src/services/` | File upload, OCR processing |
-| `sync.service.ts` | `backend/src/services/` | Data synchronization |
+| `sync.routes.ts` | `backend/src/routes/` | Data synchronization API |
+| `email.service.ts` | `backend/src/services/` | Email notifications |
+| `maintenance-checker.service.ts` | `backend/src/services/` | Daily maintenance checks |
 
 ### Diagram System Categories
 

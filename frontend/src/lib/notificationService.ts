@@ -4,10 +4,10 @@
  * and creates notifications based on user preferences
  */
 
-import { useNotificationStore, Notification } from '../store/notificationStore';
-import { useMaintenanceStore, MaintenanceTask } from '../store/maintenanceStore';
-import { useInventoryStore, InventoryItem } from '../store/inventoryStore';
-import { useProjectStore, Project } from '../store/projectStore';
+import { useNotificationStore, requestNotificationPermission } from '../store/notificationStore';
+import { useMaintenanceStore } from '../store/maintenanceStore';
+import { useInventoryStore } from '../store/inventoryStore';
+import { useProjectStore } from '../store/projectStore';
 import { useWarrantyStore } from '../store/warrantyStore';
 
 /**
@@ -81,7 +81,7 @@ export function checkWarrantyNotifications() {
   // Also check inventory items with embedded warranties
   const { items } = useInventoryStore.getState();
   for (const item of items) {
-    if (item.status !== 'active' || !item.warranty) continue;
+    if (item.status !== 'active' || !item.warranty || !item.warranty.endDate) continue;
     
     const endDate = new Date(item.warranty.endDate);
     const today = new Date();
@@ -196,6 +196,3 @@ export function initNotificationService() {
     setInterval(runNotificationChecks, 24 * 60 * 60 * 1000);
   }, msUntilMidnight);
 }
-
-import { requestNotificationPermission } from '../store/notificationStore';
-

@@ -10,7 +10,7 @@
 
 import { useAISettingsStore } from '../store/aiSettingsStore';
 import { DetectedObject, ReceiptMatch } from '../store/inventoryStagingStore';
-import { useDocumentStore, Document } from '../store/documentStore';
+import { useDocumentStore } from '../store/documentStore';
 import { DEFAULT_CATEGORIES } from '../store/inventoryStore';
 
 // OpenAI Vision API for image analysis
@@ -93,7 +93,7 @@ function getAIConfig() {
     throw new Error(`No API key configured for ${provider}`);
   }
   
-  return { provider, ...config };
+  return { ...config, provider };
 }
 
 /**
@@ -333,7 +333,6 @@ export function fuzzyMatch(str1: string, str2: string, threshold: number = 0.8):
   
   // Simple Levenshtein-like similarity
   const longer = s1.length > s2.length ? s1 : s2;
-  const shorter = s1.length > s2.length ? s2 : s1;
   
   if (longer.length === 0) return true;
   
@@ -397,7 +396,7 @@ export async function findReceiptMatches(
   itemName: string,
   brand: string | undefined,
   modelNumber: string | undefined,
-  imageDate?: string // Date when photo was taken
+  _imageDate?: string // Date when photo was taken (reserved for future use)
 ): Promise<ReceiptMatch[]> {
   // Get all documents with OCR text or AI extraction
   const documents = useDocumentStore.getState().documents;

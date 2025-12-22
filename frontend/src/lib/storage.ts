@@ -17,6 +17,10 @@ export interface StorageData {
   customOptions: any;
   homeVitals: any;
   diagrams: any[];
+  aiSettings?: any;
+  inventoryStaging?: any;
+  transactions?: any[];
+  budgets?: any[];
 }
 
 // Initialize storage with default data
@@ -36,6 +40,10 @@ export const initStorage = () => {
       customOptions: {},
       homeVitals: {},
       diagrams: [],
+      aiSettings: {},
+      inventoryStaging: {},
+      transactions: [],
+      budgets: []
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
   }
@@ -50,6 +58,7 @@ export const getAllData = (): StorageData => {
     if (!newData) {
       // Fallback if still no data
       return {
+        version: VERSION,
         projects: [],
         vendors: [],
         items: [],
@@ -60,6 +69,10 @@ export const getAllData = (): StorageData => {
         customOptions: {},
         homeVitals: {},
         diagrams: [],
+        aiSettings: {},
+        inventoryStaging: {},
+        transactions: [],
+        budgets: [],
         lastUpdated: new Date().toISOString(),
       };
     }
@@ -83,7 +96,7 @@ export const getCollection = (collection: keyof Omit<StorageData, 'version' | 'l
 // Save specific collection
 export const saveCollection = (
   collection: keyof Omit<StorageData, 'version' | 'lastUpdated'>,
-  items: any[]
+  items: any
 ) => {
   const data = getAllData();
   data[collection] = items;

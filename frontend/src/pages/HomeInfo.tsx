@@ -32,7 +32,7 @@ import {
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { useHomeVitalsStore, PaintColor, EmergencyContact, HomeValue } from '../store/homeVitalsStore';
 import { usePropertyValueStore } from '../store/propertyValueStore';
-import { fetchPropertyValue, shouldAutoUpdate, formatPropertyValue } from '../lib/propertyValueService';
+import { fetchPropertyValue, shouldAutoUpdate } from '../lib/propertyValueService';
 import { EditableSelect } from '../components/ui/EditableSelect';
 import { ValueTrendChart } from '../components/ui/Chart';
 import { askAboutHome } from '../lib/aiService';

@@ -35,6 +35,8 @@ import {
   BrainCircuit,
   Calendar,
   TrendingUp,
+  Bell,
+  Smartphone,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -50,7 +52,6 @@ export default function Settings() {
     settings: aiSettings, 
     setActiveProvider, 
     updateProviderConfig,
-    setDiagramAssistant,
     updateFeatureToggle,
     setAssistantSchedule,
   } = useAISettingsStore();

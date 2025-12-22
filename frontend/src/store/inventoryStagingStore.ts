@@ -61,6 +61,7 @@ export interface StagedImage {
   suggestedName?: string;
   suggestedCategory?: string;
   suggestedBrand?: string;
+  suggestedLocation?: string;
   
   // Receipt matching
   receiptMatches: ReceiptMatch[];

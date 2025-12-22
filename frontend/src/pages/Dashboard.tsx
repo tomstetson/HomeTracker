@@ -17,7 +17,6 @@ export default function Dashboard() {
   
   // Subscribe to AI settings state for reactivity
   const aiSettings = useAISettingsStore((state) => state.settings);
-  const { isFeatureEnabled } = useAISettingsStore();
 
   const upcomingTasks = getUpcomingTasks();
   const expiringWarranties = getExpiringWarranties(90);

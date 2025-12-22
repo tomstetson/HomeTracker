@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Tldraw, Editor, exportToBlob } from 'tldraw';
 import 'tldraw/tldraw.css';
 import mermaid from 'mermaid';
+import DOMPurify from 'dompurify';
 import { useDiagramStore, Diagram, DIAGRAM_CATEGORIES } from '../store/diagramStore';
 import { useInventoryStore } from '../store/inventoryStore';
-import { useAISettingsStore } from '../store/aiSettingsStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
@@ -13,7 +13,6 @@ import { useToast } from '../components/ui/Toast';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { MermaidAIAssistant } from '../components/MermaidAIAssistant';
 import {
-  DIAGRAM_SHAPES,
   DIAGRAM_TEMPLATES,
   SHAPE_CATEGORIES,
   getShapesByCategory,
@@ -29,14 +28,11 @@ import {
   Search,
   Grid3X3,
   List,
-  Download,
   Maximize2,
   X,
   Package,
-  ChevronRight,
   Shapes,
   FileText,
-  Layers,
   ZoomIn,
   ZoomOut,
   Minimize2,
@@ -299,7 +295,7 @@ export default function Diagrams() {
     if (!editorRef.current) return;
     const editor = editorRef.current;
     
-    template.shapes.forEach((shape, index) => {
+    template.shapes.forEach((shape) => {
       if (shape.type === 'rect') {
         editor.createShape({
           type: 'geo',
@@ -831,7 +827,7 @@ export default function Diagrams() {
               ) : mermaidSvg ? (
                 <div 
                   className="mermaid-output"
-                  dangerouslySetInnerHTML={{ __html: mermaidSvg }} 
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mermaidSvg, { USE_PROFILES: { svg: true } }) }} 
                 />
               ) : (
                 <p className="text-muted-foreground text-sm">Enter Mermaid code to see preview</p>

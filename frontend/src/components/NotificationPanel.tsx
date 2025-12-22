@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useNotificationStore, Notification } from '../store/notificationStore';
 import { Bell, X, Check, Trash2, AlertCircle, AlertTriangle, Info, Calendar, Package, Wrench } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
-import { Dialog } from './ui/Dialog';
+// Dialog import removed - not currently used
 import { Button } from './ui/Button';
 
 export default function NotificationPanel() {
@@ -166,7 +166,7 @@ interface NotificationItemProps {
   getIcon: (type: Notification['type'], severity: Notification['severity']) => React.ReactNode;
 }
 
-function NotificationItem({ notification, onRead, onDelete, onClick, getIcon }: NotificationItemProps) {
+function NotificationItem({ notification, onRead: _onRead, onDelete, onClick, getIcon }: NotificationItemProps) {
   const content = notification.actionUrl ? (
     <Link
       to={notification.actionUrl}

@@ -13,7 +13,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Sparkles, 
   Send, 
-  X, 
   ChevronDown, 
   ChevronUp, 
   AlertCircle, 
@@ -29,7 +28,7 @@ import {
 import { Link } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { cn } from '../lib/utils';
-import { useAISettingsStore } from '../store/aiSettingsStore';
+// useAISettingsStore import removed - not currently needed
 import { homeChat, isAIReady, AIMessage, parseResponse } from '../lib/aiService';
 
 // ============================================================================
@@ -132,9 +131,7 @@ export function AIQueryPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const { isAIEnabled } = useAISettingsStore();
   const aiReady = isAIReady();
-  const aiEnabled = isAIEnabled();
 
   // Get quick actions for current context
   const actions = quickActions || QUICK_ACTIONS[context] || QUICK_ACTIONS.general;

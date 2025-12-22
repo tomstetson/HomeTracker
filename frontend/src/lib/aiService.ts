@@ -9,8 +9,8 @@
  * - Rate limiting and error handling
  */
 
-import { useAISettingsStore, AIProvider } from '../store/aiSettingsStore';
-import { buildHomeContext, contextToPrompt, contextToCompactJSON, contextToNaturalLanguage, HomeContext } from './homeContext';
+import { useAISettingsStore } from '../store/aiSettingsStore';
+import { buildHomeContext, contextToPrompt, contextToCompactJSON, contextToNaturalLanguage } from './homeContext';
 
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -29,6 +29,8 @@ export interface SendPromptOptions {
   conversationHistory?: AIMessage[];
   includeHomeContext?: boolean;
   homeContextFormat?: 'full' | 'compact' | 'summary' | 'natural';
+  /** Pre-built home context object to use instead of building one */
+  homeContext?: any;
   maxTokens?: number;
   temperature?: number;
   /** Use faster/cheaper model for simple queries */

@@ -4,8 +4,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import {
   Search, X, FileText, FolderKanban, Package, Wrench, Users,
   Shield, Heart, Settings, Home, HardDrive, FileSpreadsheet,
-  ArrowRight, Command, CornerDownLeft, PenTool, Sparkles, RefreshCw,
-  MessageSquare
+  ArrowRight, Command, CornerDownLeft, PenTool, Sparkles, RefreshCw
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 

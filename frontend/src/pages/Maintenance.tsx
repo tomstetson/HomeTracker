@@ -30,7 +30,7 @@ import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { generateMaintenanceRecommendations, predictMaintenanceIssues, optimizeMaintenanceSchedule, MaintenanceRecommendation, PredictiveMaintenance } from '../lib/maintenanceAutomation';
 import { useAISettingsStore } from '../store/aiSettingsStore';
 import { isAIReady } from '../lib/aiService';
-import { Sparkles, Brain, TrendingUp, Loader2, AlertCircle, CheckCircle, Calendar, DollarSign } from 'lucide-react';
+import { Sparkles, Brain, TrendingUp, Loader2, CheckCircle } from 'lucide-react';
 
 type ViewMode = 'tasks' | 'history';
 type DisplayMode = 'list' | 'card';
@@ -362,10 +362,12 @@ export default function Maintenance() {
     }
     
     addTask({
+      id: Date.now().toString(),
       title: rec.title,
       description: rec.description,
       category: rec.category,
       priority: rec.priority,
+      status: 'pending',
       dueDate: dueDate.toISOString().split('T')[0],
       recurrence: rec.suggestedFrequency !== 'none' ? rec.suggestedFrequency : undefined,
       estimatedCost: rec.estimatedCost,

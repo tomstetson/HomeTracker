@@ -5,8 +5,8 @@
 
 import { sendPrompt, isAIReady } from './aiService';
 import { buildHomeContext } from './homeContext';
-import { useInventoryStore, InventoryItem } from '../store/inventoryStore';
-import { useMaintenanceStore, MaintenanceTask } from '../store/maintenanceStore';
+import { useInventoryStore } from '../store/inventoryStore';
+import { useMaintenanceStore } from '../store/maintenanceStore';
 import { useAISettingsStore } from '../store/aiSettingsStore';
 
 export interface MaintenanceRecommendation {

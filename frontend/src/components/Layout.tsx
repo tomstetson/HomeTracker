@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Home,
@@ -9,7 +9,6 @@ import {
   Menu,
   X,
   Settings,
-  Bell,
   Users,
   Database,
   Sun,
@@ -18,6 +17,7 @@ import {
   ChevronRight,
   Building2,
   PenTool,
+  Wallet,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
@@ -33,14 +33,13 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isDataManagerOpen, setIsDataManagerOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
   const { resolvedTheme, toggleTheme } = useTheme();
   
+  // Check for mobile device on mount
   useEffect(() => {
-    setIsMobile(isMobileDevice());
-    // Auto-collapse sidebar on mobile
-    if (isMobileDevice()) {
+    const checkMobile = () => window.innerWidth < 768;
+    if (checkMobile()) {
       setSidebarCollapsed(true);
     }
   }, []);
@@ -57,6 +56,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Documents', href: '/documents', icon: FileText },
     { name: 'Diagrams', href: '/diagrams', icon: PenTool },
     { name: 'Home Info', href: '/home-info', icon: Building2 },
+    { name: 'Budget', href: '/budget', icon: Wallet },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 

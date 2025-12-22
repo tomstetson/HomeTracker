@@ -58,7 +58,7 @@ export interface LinkedRecord {
 export function DocumentExtractionModal({
   open,
   onClose,
-  document,
+  document: _document, // Reserved for future use
   ocrText,
   onExtractionComplete,
 }: DocumentExtractionModalProps) {

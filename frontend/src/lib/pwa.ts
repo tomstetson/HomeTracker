@@ -1,34 +1,42 @@
 /**
  * PWA Service
  * Handles service worker registration and PWA installation
+ * 
+ * NOTE: VitePWA plugin handles service worker registration automatically
+ * when registerType is set to 'autoUpdate' in vite.config.ts.
+ * This function checks for an existing registration instead of creating one.
  */
 
 export async function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/',
-      });
+      // VitePWA auto-registers the SW, so we just get the existing registration
+      const registration = await navigator.serviceWorker.getRegistration();
       
-      console.log('[PWA] Service Worker registered:', registration.scope);
-      
-      // Check for updates
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New service worker available
-              console.log('[PWA] New service worker available');
-              // Could show a notification to user to refresh
-            }
-          });
-        }
-      });
-      
-      return registration;
+      if (registration) {
+        console.log('[PWA] Service Worker registered:', registration.scope);
+        
+        // Check for updates
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New service worker available
+                console.log('[PWA] New service worker available');
+                // Could show a notification to user to refresh
+              }
+            });
+          }
+        });
+        
+        return registration;
+      } else {
+        console.log('[PWA] No service worker registration found - this is normal in development');
+        return null;
+      }
     } catch (error) {
-      console.error('[PWA] Service Worker registration failed:', error);
+      console.error('[PWA] Service Worker check failed:', error);
       return null;
     }
   }

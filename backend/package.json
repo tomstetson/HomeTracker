@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "ts-node src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "lint": "eslint src --ext .ts --report-unused-disable-directives",
+    "lint:security": "eslint src --ext .ts --plugin security",
+    "security:scan": "secretlint \"src/**/*\""
   },
   "author": "Tom Stetson",
   "license": "PRIVATE",
@@ -25,7 +28,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.11",
     "passport": "^0.7.0",
@@ -48,6 +51,8 @@
     "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.16.0",
     "@typescript-eslint/parser": "^6.16.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-security": "^3.0.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "ts-node": "^10.9.2",

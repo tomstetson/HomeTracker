@@ -101,7 +101,8 @@ async function fetchRentCastValue(
  * Note: Zillow's official API is deprecated, but we can scrape public data
  * This is a placeholder for future implementation
  */
-async function fetchZillowValue(
+// @ts-ignore - Placeholder for future Zillow API integration
+async function _fetchZillowValue(
   address: string,
   city: string,
   state: string,

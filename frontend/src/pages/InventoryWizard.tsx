@@ -2,27 +2,27 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Dialog, DialogFooter } from '../components/ui/Dialog';
-import { Input, Select, Textarea } from '../components/ui/Input';
+// Dialog imports removed - not currently used
+import { Input, Select } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useConfirm } from '../components/ui/ConfirmDialog';
-import { fileApi, StoredFile } from '../lib/fileApi';
-import { analyzeImage, findReceiptMatches, processBatchImages } from '../lib/imageAnalysis';
+import { fileApi } from '../lib/fileApi';
+import { analyzeImage, findReceiptMatches } from '../lib/imageAnalysis';
 import { 
   useInventoryStagingStore, 
   StagedImage, 
   StagedInventoryItem,
   DetectedObject 
 } from '../store/inventoryStagingStore';
-import { useInventoryStore, DEFAULT_CATEGORIES, InventoryItem } from '../store/inventoryStore';
+import { useInventoryStore, InventoryItem } from '../store/inventoryStore';
 import { useAISettingsStore } from '../store/aiSettingsStore';
 import { isAIReady } from '../lib/aiService';
 import {
-  Upload, Camera, FolderOpen, Cloud, ArrowRight, ArrowLeft,
-  CheckCircle, XCircle, AlertTriangle, Loader2, Image as ImageIcon,
-  Package, Tag, DollarSign, Calendar, FileText, Link2,   RefreshCw,
-  Trash2, Eye, Edit, Check, X, Sparkles, Brain, Layers, Copy,
-  Square, CheckSquare, MapPin
+  Upload, Camera, Cloud, ArrowRight, ArrowLeft,
+  CheckCircle, AlertTriangle, Loader2,
+  Package, DollarSign, Calendar, Link2,
+  X, Sparkles, Brain, Layers, Copy,
+  CheckSquare, MapPin, Check, Edit
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -51,12 +51,10 @@ export default function InventoryWizard() {
     updateSession,
     addStagedImage,
     updateStagedImage,
-    markAsDuplicate,
     addStagedItem,
     updateStagedItem,
     approveItem,
     rejectItem,
-    approveAllItems,
   } = useInventoryStagingStore();
   
   const { addItem } = useInventoryStore();
@@ -69,10 +67,10 @@ export default function InventoryWizard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0, item: '' });
   const [dragActive, setDragActive] = useState(false);
-  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isBatchMode, setIsBatchMode] = useState(false);
+  // @ts-expect-error - editingItemId getter reserved for future inline editing UI
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
   
   // Initialize session if not exists
   useEffect(() => {
@@ -150,7 +148,7 @@ export default function InventoryWizard() {
   // Run AI analysis on all pending images
   const runAnalysis = async () => {
     if (!canAnalyze) {
-      toast.error('AI not ready', aiReady.message || 'Configure AI in settings');
+      toast.error('AI not ready', aiReady.error || 'Configure AI in settings');
       return;
     }
     
@@ -235,7 +233,7 @@ export default function InventoryWizard() {
     // Create staged items from unique detected objects
     updateSession({ status: 'matching' });
     
-    for (const [key, data] of detectedItems) {
+    for (const [, data] of detectedItems) {
       const { object, imageIds, primaryImageId } = data;
       
       // Find matching receipts (pass image upload date for date proximity matching)
@@ -482,8 +480,8 @@ export default function InventoryWizard() {
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <button
                     onClick={() => {
-                      const newImages = stagedImages.filter(i => i.id !== img.id);
-                      // Remove from store would go here
+                      const { removeStagedImage } = useInventoryStagingStore.getState();
+                      removeStagedImage(img.id);
                     }}
                     className="p-1 rounded-full bg-red-500 text-white"
                   >
@@ -529,7 +527,7 @@ export default function InventoryWizard() {
             {!canAnalyze && (
               <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                 <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                  {aiReady.message || 'AI is not configured. Go to Settings to add your API key.'}
+                  {aiReady.error || 'AI is not configured. Go to Settings to add your API key.'}
                 </p>
               </div>
             )}
@@ -630,17 +628,10 @@ export default function InventoryWizard() {
     });
   };
   
-  const batchUpdateCategory = (category: string) => {
-    selectedItems.forEach(id => {
-      updateStagedItem(id, { category });
-    });
-  };
-  
   // Review step
   const renderReviewStep = () => {
     const pendingItems = stagedItems.filter(i => i.status === 'pending');
     const approvedItems = stagedItems.filter(i => i.status === 'approved');
-    const rejectedItems = stagedItems.filter(i => i.status === 'rejected');
     
     return (
       <div className="space-y-6">
@@ -722,18 +713,19 @@ export default function InventoryWizard() {
                           }
                         }}
                         className="text-sm"
-                      >
-                        <option value="">Set Location...</option>
-                        <option value="Kitchen">Kitchen</option>
-                        <option value="Living Room">Living Room</option>
-                        <option value="Bedroom">Bedroom</option>
-                        <option value="Garage">Garage</option>
-                        <option value="Basement">Basement</option>
-                        <option value="Attic">Attic</option>
-                        <option value="Bathroom">Bathroom</option>
-                        <option value="Office">Office</option>
-                        <option value="Outdoor">Outdoor</option>
-                      </Select>
+                        options={[
+                          { value: "", label: "Set Location..." },
+                          { value: "Kitchen", label: "Kitchen" },
+                          { value: "Living Room", label: "Living Room" },
+                          { value: "Bedroom", label: "Bedroom" },
+                          { value: "Garage", label: "Garage" },
+                          { value: "Basement", label: "Basement" },
+                          { value: "Attic", label: "Attic" },
+                          { value: "Bathroom", label: "Bathroom" },
+                          { value: "Office", label: "Office" },
+                          { value: "Outdoor", label: "Outdoor" },
+                        ]}
+                      />
                     </div>
                   </>
                 )}

@@ -11,6 +11,7 @@ import Maintenance from './pages/Maintenance';
 import Documents from './pages/Documents';
 import Diagrams from './pages/Diagrams';
 import HomeInfo from './pages/HomeInfo';
+import Budget from './pages/Budget';
 import Settings from './pages/Settings';
 import { ToastContainer, useToast } from './components/ui/Toast';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
@@ -59,6 +60,7 @@ function AppContent() {
         <Route path="/documents" element={<Documents />} />
         <Route path="/diagrams" element={<Diagrams />} />
         <Route path="/home-info" element={<HomeInfo />} />
+        <Route path="/budget" element={<Budget />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Layout>

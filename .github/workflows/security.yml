@@ -20,15 +20,59 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Backend Dependencies
+        run: cd backend && npm ci
+
+      - name: Install Frontend Dependencies
+        run: cd frontend && npm ci
+
       - name: Audit Backend Dependencies
-        run: |
-          cd backend
-          npm audit --audit-level=high
+        run: cd backend && npm audit --audit-level=high
 
       - name: Audit Frontend Dependencies
+        run: cd frontend && npm audit --audit-level=high
+
+  osv-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: |-
+            --lockfile=frontend/package-lock.json
+            --lockfile=backend/package-lock.json
+
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: semgrep scan --config auto --config p/security-audit --config p/nodejs --config p/typescript --config p/react --error --json > semgrep-results.json || true
+
+      - name: Upload Semgrep Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-results
+          path: semgrep-results.json
+
+      - name: Check Semgrep Findings
         run: |
-          cd frontend
-          npm audit --audit-level=high
+          if [ -s semgrep-results.json ]; then
+            echo "Semgrep findings:"
+            cat semgrep-results.json | jq '.results | length' 
+            findings=$(cat semgrep-results.json | jq '.results | length')
+            if [ "$findings" -gt 0 ]; then
+              echo "::warning::Semgrep found $findings potential security issues"
+              cat semgrep-results.json | jq '.results[] | {path: .path, line: .start.line, message: .extra.message, severity: .extra.severity}'
+            fi
+          fi
 
   trivy-scan:
     runs-on: ubuntu-latest
