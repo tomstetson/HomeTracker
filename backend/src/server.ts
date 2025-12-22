@@ -23,11 +23,13 @@ import syncRoutes from './routes/sync.routes';
 import authRoutes from './routes/auth.routes';
 import imagesRoutes from './routes/images.routes';
 import aiJobsRoutes from './routes/ai-jobs.routes';
+import storageRoutes from './routes/storage.routes';
 
 // Import Excel service for graceful shutdown
 import { excelService } from './services/excel.service';
 import { maintenanceChecker } from './services/maintenance-checker.service';
 import { databaseService } from './services/database.service';
+import { backupSchedulerService } from './services/backup-scheduler.service';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
@@ -67,6 +69,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/images', imagesRoutes);
 app.use('/api/ai-jobs', aiJobsRoutes);
+app.use('/api/storage', storageRoutes);
 
 // Settings routes
 app.get('/api/settings', (req: Request, res: Response) => {
@@ -119,6 +122,7 @@ const server = app.listen(PORT, () => {
   
   // Initialize background jobs
   maintenanceChecker.init();
+  backupSchedulerService.initialize();
 });
 
 // Handle server errors

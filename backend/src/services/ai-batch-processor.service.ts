@@ -114,6 +114,60 @@ Focus on accuracy. If you can't determine something, use null or 'unknown'. Be s
   "maintenanceNeeded": ["any maintenance suggestions"],
   "confidence": 0.0 to 1.0
 }`,
+
+  warranty_detection: `Analyze this image for warranty or product information. Look for:
+- Product labels, stickers, or tags
+- Serial numbers, model numbers
+- Purchase receipts or warranty cards
+- Manufacture dates or warranty expiration dates
+
+Provide JSON:
+{
+  "hasWarrantyInfo": true/false,
+  "productName": "product name if visible",
+  "brand": "brand name",
+  "model": "model number",
+  "serialNumber": "serial number if visible",
+  "manufactureDate": "YYYY-MM-DD if found",
+  "purchaseDate": "YYYY-MM-DD if found",
+  "warrantyPeriod": "warranty duration (e.g., '2 years', '90 days')",
+  "warrantyExpires": "YYYY-MM-DD if determinable",
+  "warrantyType": "manufacturer/extended/home_warranty",
+  "warrantyProvider": "provider name if visible",
+  "claimPhone": "phone number if visible",
+  "claimWebsite": "website if visible",
+  "coverageDetails": "what's covered",
+  "documentType": "receipt/warranty_card/product_label/manual",
+  "confidence": 0.0 to 1.0
+}`,
+
+  appliance_identification: `Identify this home appliance or tool. Focus on:
+- Exact type of appliance/tool
+- Brand and model
+- Age indicators
+- Typical warranty periods for this type
+- Common maintenance needs
+
+Provide JSON:
+{
+  "objectType": "specific appliance/tool type",
+  "category": "Kitchen Appliances/HVAC/Plumbing/Tools/Outdoor Equipment/Electronics/etc",
+  "brand": "brand name",
+  "model": "model number/name",
+  "serialNumber": "if visible",
+  "estimatedAge": "new/1-2 years/3-5 years/5-10 years/10+ years",
+  "condition": "excellent/good/fair/poor",
+  "typicalWarrantyPeriod": "typical warranty for this type of item",
+  "typicalLifespan": "expected lifespan",
+  "maintenanceSchedule": [
+    { "task": "maintenance task", "frequency": "monthly/quarterly/annually" }
+  ],
+  "estimatedValue": { "low": 0, "high": 0 },
+  "energyEfficiency": "if applicable",
+  "description": "brief description",
+  "tags": ["relevant", "tags"],
+  "confidence": 0.0 to 1.0
+}`,
 };
 
 class AIBatchProcessorService {
