@@ -2,7 +2,159 @@
 
 > **Purpose**: This file provides continuity for AI coding assistants (Claude Code, Cursor, Windsurf, etc.) to understand the project's current state, implemented features, and future roadmap.
 > 
-> **Last Updated**: 2024-12-21 | **Version**: 1.8.0
+> **Last Updated**: 2024-12-22 | **Version**: 2.0.0
+
+---
+
+## 🚀 SESSION SUMMARY: Dec 22, 2024 - Major SQLite & Storage Architecture Upgrade
+
+### What Was Accomplished
+
+This session implemented a **complete backend storage overhaul** transforming HomeTracker from a simple JSON-file app into a scalable, AI-powered home management system ready for homelab deployment.
+
+#### 1. SQLite Database Implementation (`database.service.ts`)
+- **Full relational schema** with 15+ tables
+- WAL mode for performance
+- FTS5 full-text search on inventory items
+- Automatic schema migrations with versioning
+- Tables: users, properties, items, images, ai_jobs, projects, vendors, maintenance_tasks, documents, warranties, transactions, budgets, diagrams, categories, settings, sync_log
+
+#### 2. Image Storage System (`image-storage.service.ts`)
+- Single and batch image uploads (100+ at once)
+- Automatic thumbnail generation via Sharp
+- EXIF rotation handling
+- Base64 encoding for AI APIs
+- Storage stats and orphan cleanup
+
+#### 3. AI Batch Processing (`ai-batch-processor.service.ts`)
+- **BYOK Support**: OpenAI, Anthropic, Google
+- **Analysis Types**:
+  - `inventory_detection` - Auto-create items with category, brand, condition
+  - `warranty_detection` - Extract warranty info from labels/receipts
+  - `appliance_identification` - Identify tools/appliances + maintenance schedules
+  - `receipt_scan` - Parse purchase receipts
+  - `condition_assessment` - Assess item condition
+- Job queue with progress tracking
+- Auto-create inventory items from analysis
+- Cost estimation per job
+
+#### 4. Storage Provider System (`storage-providers/`)
+- **Pluggable architecture** for multiple backends
+- `LocalStorageProvider` - Default, always available
+- `WebDAVStorageProvider` - NAS support (Synology, QNAP, Nextcloud)
+- Easy to extend with S3, Google Drive, OneDrive
+
+#### 5. Backup Scheduler (`backup-scheduler.service.ts`)
+- Cron-based automated backups
+- Multi-provider destinations
+- Configurable retention policies
+- Compression (gzip) support
+- Progress tracking and logging
+
+### New API Endpoints
+
+```
+# Images
+POST /api/images/upload           # Single image
+POST /api/images/batch-upload     # Batch with AI job creation
+GET  /api/images/:id              # Get image
+GET  /api/images/:id/thumbnail    # Get thumbnail
+
+# AI Jobs
+POST /api/ai-jobs                 # Create analysis job
+GET  /api/ai-jobs/:id             # Job status
+POST /api/ai-jobs/configure       # Set AI provider
+POST /api/ai-jobs/analyze-single  # Single image analysis
+
+# Storage & Backup
+POST /api/storage/providers/webdav   # Configure NAS
+GET  /api/storage/providers          # List providers
+POST /api/storage/schedules          # Create backup schedule
+POST /api/storage/schedules/:id/run  # Run backup now
+GET  /api/storage/backups            # List all backups
+```
+
+### Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        HomeTracker v2.0                         │
+├─────────────────────────────────────────────────────────────────┤
+│  SQLite Database (WAL mode)                                     │
+│  ├── items + FTS5 search                                        │
+│  ├── images with AI metadata                                    │
+│  ├── ai_jobs / ai_job_items (batch processing)                  │
+│  ├── warranties (linked to items)                               │
+│  └── maintenance_tasks (with AI suggestions)                    │
+├─────────────────────────────────────────────────────────────────┤
+│  Storage Providers (pluggable)                                  │
+│  ├── LocalStorageProvider (default)                             │
+│  ├── WebDAVStorageProvider (NAS: Synology/QNAP/Nextcloud)       │
+│  └── [Future: S3, Google Drive, OneDrive]                       │
+├─────────────────────────────────────────────────────────────────┤
+│  Backup Scheduler                                               │
+│  ├── Cron-based automation                                      │
+│  ├── Multi-provider destinations                                │
+│  └── Retention policies + compression                           │
+├─────────────────────────────────────────────────────────────────┤
+│  AI Batch Processor (BYOK)                                      │
+│  ├── inventory_detection    → Auto-create items                 │
+│  ├── warranty_detection     → Extract warranty info             │
+│  ├── appliance_identification → Tools + maintenance schedules   │
+│  └── Providers: OpenAI, Anthropic, Google                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Files Created/Modified
+
+| File | Type | Purpose |
+|------|------|---------|
+| `backend/src/services/database.service.ts` | New | SQLite schema + migrations |
+| `backend/src/services/image-storage.service.ts` | New | Image upload + thumbnails |
+| `backend/src/services/ai-batch-processor.service.ts` | New | AI batch processing |
+| `backend/src/services/backup-scheduler.service.ts` | New | Automated backups |
+| `backend/src/services/storage-providers/index.ts` | New | Provider interface |
+| `backend/src/services/storage-providers/local.provider.ts` | New | Local filesystem |
+| `backend/src/services/storage-providers/webdav.provider.ts` | New | NAS/WebDAV |
+| `backend/src/routes/images.routes.ts` | New | Image API |
+| `backend/src/routes/ai-jobs.routes.ts` | New | AI jobs API |
+| `backend/src/routes/storage.routes.ts` | New | Storage/backup API |
+| `backend/src/server.ts` | Modified | Added new routes |
+| `backend/Dockerfile` | Modified | Added Sharp/SQLite deps |
+| `docker-compose.yml` | Modified | Image volumes, AI env vars |
+| `docs/STORAGE_ARCHITECTURE_RECOMMENDATIONS.md` | New | Architecture doc |
+
+### Dependencies Added (Backend)
+- `better-sqlite3` - SQLite database
+- `sharp` - Image processing
+- `webdav` - NAS connectivity
+- `node-cron` - Scheduled backups
+- `uuid` - ID generation
+
+### What's Next (Recommended Priority)
+
+1. **Frontend Image Upload Component** - Create unified upload UI for inventory/warranty
+2. **Frontend AI Job Status UI** - Show progress, results, create items from analysis
+3. **Frontend Storage Settings** - Configure NAS, view backups, run manual backup
+4. **Integrate AI into Inventory Page** - Batch upload photos → auto-categorize
+5. **Integrate AI into Warranty Page** - Scan warranty cards/receipts
+
+### Docker Deployment Ready
+
+```bash
+# Configure NAS backup
+curl -X POST http://localhost:3001/api/storage/providers/webdav \
+  -d '{"name":"nas","url":"https://nas.local:5006","username":"user","password":"pass"}'
+
+# Create daily backup schedule  
+curl -X POST http://localhost:3001/api/storage/schedules \
+  -d '{"name":"Daily NAS","provider":"nas","schedule":"0 2 * * *","retentionDays":30}'
+
+# Batch upload inventory photos with AI analysis
+curl -X POST http://localhost:3001/api/images/batch-upload \
+  -F "images=@photo1.jpg" -F "images=@photo2.jpg" \
+  -F "entityType=item" -F "createAIJob=true"
+```
 
 ---
 
@@ -12,8 +164,9 @@
 
 ### Tech Stack
 - **Frontend**: React 18, TypeScript, Vite 7, Tailwind CSS, Zustand (state management)
-- **Backend**: Node.js 20, Express.js, ExcelJS
-- **Storage**: JSON files + Excel export (hometracker.xlsx)
+- **Backend**: Node.js 20, Express.js, SQLite (better-sqlite3), Sharp (images)
+- **Database**: SQLite with WAL mode, FTS5 full-text search
+- **Storage**: SQLite DB + JSON export + Image files (local/NAS/cloud)
 - **Deployment**: Docker (multi-stage build), Nginx, Supervisor
 - **Special Libraries**: tldraw (diagrams), mermaid (code diagrams), Tesseract.js (OCR), DOMPurify (XSS protection)
 - **AI Integration**: BYOK (Bring Your Own Key) support for OpenAI, Anthropic (Claude), Google Gemini
