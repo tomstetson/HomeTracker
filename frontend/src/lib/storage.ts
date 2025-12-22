@@ -1,9 +1,13 @@
 // LocalStorage Database Layer
 // This provides persistence for all app data
 // Demo data is centralized in ./demoData.ts
+// Migrations are handled in ./migrations/
+
+import { runMigrations, needsMigration } from './migrations/runner';
+import { consolidateStorageKeys, hasLegacyKeys } from './migrations/consolidate';
+import { getLatestVersion } from './migrations/index';
 
 const STORAGE_KEY = 'hometracker_data';
-const VERSION = '1.0';
 
 export interface StorageData {
   version: string;
@@ -22,11 +26,19 @@ export interface StorageData {
   inventoryStaging?: any;
   transactions?: any[];
   budgets?: any[];
+  settings?: {
+    property?: any;
+    notifications?: any;
+    ai?: any;
+    display?: any;
+  };
+  _migrationHistory?: any[];
+  _migrationError?: any;
 }
 
 // Default empty data structure (demo data loaded separately via demoData.ts)
 const getEmptyData = (): StorageData => ({
-  version: VERSION,
+  version: getLatestVersion(),
   lastUpdated: new Date().toISOString(),
   items: [],
   vendors: [],
@@ -57,42 +69,46 @@ const getEmptyData = (): StorageData => ({
 
 // Initialize storage with empty data (demo data loaded separately)
 export const initStorage = () => {
+  // First, consolidate any legacy storage keys
+  if (hasLegacyKeys()) {
+    consolidateStorageKeys();
+  }
+  
   const existing = localStorage.getItem(STORAGE_KEY);
   if (!existing) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(getEmptyData()));
   }
 };
 
-// Get all data
+// Get all data (with automatic migration)
 export const getAllData = (): StorageData => {
-  const data = localStorage.getItem(STORAGE_KEY);
-  if (!data) {
+  const dataStr = localStorage.getItem(STORAGE_KEY);
+  
+  if (!dataStr) {
     initStorage();
-    const newData = localStorage.getItem(STORAGE_KEY);
-    if (!newData) {
+    const newDataStr = localStorage.getItem(STORAGE_KEY);
+    if (!newDataStr) {
       // Fallback if still no data
-      return {
-        version: VERSION,
-        projects: [],
-        vendors: [],
-        items: [],
-        maintenanceTasks: [],
-        warranties: [],
-        documents: [],
-        categories: [],
-        customOptions: {},
-        homeVitals: {},
-        diagrams: [],
-        aiSettings: {},
-        inventoryStaging: {},
-        transactions: [],
-        budgets: [],
-        lastUpdated: new Date().toISOString(),
-      };
+      return getEmptyData();
     }
-    return JSON.parse(newData);
+    return JSON.parse(newDataStr);
   }
-  return JSON.parse(data);
+  
+  let data = JSON.parse(dataStr);
+  
+  // Run migrations if needed
+  if (needsMigration(data)) {
+    const { data: migratedData, result } = runMigrations(data);
+    
+    // Save migrated data
+    if (result.migrationsRun.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migratedData));
+    }
+    
+    return migratedData;
+  }
+  
+  return data;
 };
 
 // Save all data
