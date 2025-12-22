@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { getAllData, saveAllData } from '../lib/storage';
 import {
   Home,
   Ruler,
@@ -145,23 +146,27 @@ export default function HomeInfo() {
   } = useHomeVitalsStore();
   
 
-  // Load settings from localStorage
+  // Load settings from consolidated storage
   useEffect(() => {
-    const stored = localStorage.getItem('hometracker_settings');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
-      } catch (error) {
-        console.error('Failed to load settings:', error);
+    try {
+      const data = getAllData();
+      if (data.settings?.property) {
+        setSettings({ ...DEFAULT_SETTINGS, ...data.settings.property });
       }
+    } catch (error) {
+      console.error('Failed to load settings:', error);
     }
   }, []);
 
-  // Save settings to localStorage
+  // Save settings to consolidated storage
   const saveSettings = () => {
     try {
-      localStorage.setItem('hometracker_settings', JSON.stringify(settings));
+      const data = getAllData();
+      if (!data.settings) {
+        data.settings = { property: {}, notifications: {}, ai: {}, display: {} };
+      }
+      data.settings.property = settings;
+      saveAllData(data);
       setHasChanges(false);
       toast.success('Saved', 'Your home information has been updated');
     } catch (error) {

@@ -22,29 +22,28 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
+import { getAllData } from '../lib/storage';
 import DataManager from './DataManager';
 import GlobalSearch from './GlobalSearch';
 import NotificationPanel from './NotificationPanel';
 
-// Hook to get property info from localStorage
+// Hook to get property info from consolidated storage
 function usePropertyInfo() {
   const [propertyInfo, setPropertyInfo] = useState<{ address: string; city: string; state: string } | null>(null);
 
   useEffect(() => {
     const loadPropertyInfo = () => {
       try {
-        const stored = localStorage.getItem('hometracker_settings');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.address || parsed.city) {
-            setPropertyInfo({
-              address: parsed.address || '',
-              city: parsed.city || '',
-              state: parsed.state || '',
-            });
-          } else {
-            setPropertyInfo(null);
-          }
+        const data = getAllData();
+        const property = data.settings?.property;
+        if (property && (property.address || property.city)) {
+          setPropertyInfo({
+            address: property.address || '',
+            city: property.city || '',
+            state: property.state || '',
+          });
+        } else {
+          setPropertyInfo(null);
         }
       } catch {
         setPropertyInfo(null);

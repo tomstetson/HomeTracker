@@ -13,6 +13,8 @@
  * - Offline queue for changes made while offline
  */
 
+import { getAllData, saveAllData } from './storage';
+
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
 export interface SyncConfig {
@@ -345,61 +347,42 @@ class RealtimeSyncService {
     }
   }
 
-  // Get all data from localStorage
+  // Get all data from consolidated storage
   private getLocalStorageData(): Record<string, any> {
-    const collections: Record<string, string> = {
-      projects: 'hometracker_projects',
-      items: 'hometracker_items',
-      vendors: 'hometracker_vendors',
-      warranties: 'hometracker_warranties',
-      maintenance: 'hometracker_maintenanceTasks',
-      documents: 'hometracker_documents',
-      homeVitals: 'hometracker_homeVitals',
+    const storageData = getAllData();
+    
+    return {
+      projects: storageData.projects || [],
+      items: storageData.items || [],
+      vendors: storageData.vendors || [],
+      warranties: storageData.warranties || [],
+      maintenance: storageData.maintenanceTasks || [],
+      documents: storageData.documents || [],
+      homeVitals: storageData.homeVitals || {},
+      settings: storageData.settings?.property || {},
     };
-
-    const data: Record<string, any> = {};
-
-    for (const [key, storageKey] of Object.entries(collections)) {
-      try {
-        const stored = localStorage.getItem(storageKey);
-        data[key] = stored ? JSON.parse(stored) : [];
-      } catch {
-        data[key] = [];
-      }
-    }
-
-    // Settings
-    try {
-      const settings = localStorage.getItem('hometracker_settings');
-      data.settings = settings ? JSON.parse(settings) : {};
-    } catch {
-      data.settings = {};
-    }
-
-    return data;
   }
 
-  // Update localStorage from server data
+  // Update consolidated storage from server data
   private updateLocalStorage(data: Record<string, any>) {
-    const mappings: Record<string, string> = {
-      projects: 'hometracker_projects',
-      items: 'hometracker_items',
-      vendors: 'hometracker_vendors',
-      warranties: 'hometracker_warranties',
-      maintenance: 'hometracker_maintenanceTasks',
-      documents: 'hometracker_documents',
-      homeVitals: 'hometracker_homeVitals',
-    };
-
-    for (const [key, storageKey] of Object.entries(mappings)) {
-      if (data[key]) {
-        localStorage.setItem(storageKey, JSON.stringify(data[key]));
-      }
-    }
-
+    const storageData = getAllData();
+    
+    if (data.projects) storageData.projects = data.projects;
+    if (data.items) storageData.items = data.items;
+    if (data.vendors) storageData.vendors = data.vendors;
+    if (data.warranties) storageData.warranties = data.warranties;
+    if (data.maintenance) storageData.maintenanceTasks = data.maintenance;
+    if (data.documents) storageData.documents = data.documents;
+    if (data.homeVitals) storageData.homeVitals = data.homeVitals;
+    
     if (data.settings) {
-      localStorage.setItem('hometracker_settings', JSON.stringify(data.settings));
+      if (!storageData.settings) {
+        storageData.settings = { property: {}, notifications: {}, ai: {}, display: {} };
+      }
+      storageData.settings.property = data.settings;
     }
+    
+    saveAllData(storageData);
   }
 
   // Event emitter

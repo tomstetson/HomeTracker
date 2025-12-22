@@ -1,6 +1,8 @@
 // Data synchronization service
 // Syncs localStorage data with backend API
 
+import { getAllData, saveAllData } from './storage';
+
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
 interface SyncStatus {
@@ -43,43 +45,19 @@ class DataSyncService {
     this.listeners.forEach(cb => cb(this.syncStatus));
   }
 
-  // Get all localStorage data
+  // Get all data from consolidated storage
   private getLocalData(): Record<string, any> {
-    const collections = {
-      projects: 'hometracker_projects',
-      items: 'hometracker_items',
-      vendors: 'hometracker_vendors',
-      warranties: 'hometracker_warranties',
-      maintenance: 'hometracker_maintenanceTasks',
-      documents: 'hometracker_documents',
-    };
-
-    const data: Record<string, any> = {};
+    const storageData = getAllData();
     
-    for (const [key, storageKey] of Object.entries(collections)) {
-      try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored) {
-          data[key] = JSON.parse(stored);
-        } else {
-          data[key] = [];
-        }
-      } catch {
-        data[key] = [];
-      }
-    }
-
-    // Get settings
-    try {
-      const settings = localStorage.getItem('hometracker_settings');
-      if (settings) {
-        data.settings = JSON.parse(settings);
-      }
-    } catch {
-      data.settings = {};
-    }
-
-    return data;
+    return {
+      projects: storageData.projects || [],
+      items: storageData.items || [],
+      vendors: storageData.vendors || [],
+      warranties: storageData.warranties || [],
+      maintenance: storageData.maintenanceTasks || [],
+      documents: storageData.documents || [],
+      settings: storageData.settings?.property || {},
+    };
   }
 
   // Sync all localStorage data to backend
@@ -144,26 +122,24 @@ class DataSyncService {
       if (result.success && result.data) {
         const data = result.data;
 
-        // Store each collection in localStorage
-        const mappings = {
-          projects: 'hometracker_projects',
-          items: 'hometracker_items',
-          vendors: 'hometracker_vendors',
-          warranties: 'hometracker_warranties',
-          maintenance: 'hometracker_maintenanceTasks',
-          documents: 'hometracker_documents',
-        };
-
-        for (const [key, storageKey] of Object.entries(mappings)) {
-          if (data[key]) {
-            localStorage.setItem(storageKey, JSON.stringify(data[key]));
-          }
-        }
-
+        // Update consolidated storage
+        const storageData = getAllData();
+        
+        if (data.projects) storageData.projects = data.projects;
+        if (data.items) storageData.items = data.items;
+        if (data.vendors) storageData.vendors = data.vendors;
+        if (data.warranties) storageData.warranties = data.warranties;
+        if (data.maintenance) storageData.maintenanceTasks = data.maintenance;
+        if (data.documents) storageData.documents = data.documents;
+        
         if (data.settings) {
-          localStorage.setItem('hometracker_settings', JSON.stringify(data.settings));
+          if (!storageData.settings) {
+            storageData.settings = { property: {}, notifications: {}, ai: {}, display: {} };
+          }
+          storageData.settings.property = data.settings;
         }
 
+        saveAllData(storageData);
         this.syncStatus.lastSync = new Date().toISOString();
         this.notifyListeners();
 
