@@ -102,7 +102,7 @@ jobs:
           node-version: '20'
 
       - name: Install secretlint
-        run: npm install -g @secretlint/quick-start
+        run: npm install --no-save @secretlint/secretlint-rule-preset-recommend @secretlint/secretlint-rule-pattern secretlint
 
       - name: Run secretlint
         run: npx secretlint --secretlintrc .secretlintrc.json "backend/src/**/*" "frontend/src/**/*"

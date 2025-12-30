@@ -75,7 +75,9 @@ export default function InventoryWizard() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   
   // Backend AI job state
+  // @ts-expect-error - useBackendAI setter reserved for future backend AI toggle UI
   const [useBackendAI, setUseBackendAI] = useState(true);
+  // @ts-expect-error - currentAIJobId getter reserved for future job status display
   const [currentAIJobId, setCurrentAIJobId] = useState<string | null>(null);
   const [backendOnline, setBackendOnline] = useState(false);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);

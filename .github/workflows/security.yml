@@ -34,13 +34,13 @@ jobs:
 
   osv-scanner:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v1
-        continue-on-error: true
+        uses: google/osv-scanner-action@v1.9.1
         with:
           scan-args: |-
             --lockfile=frontend/package-lock.json

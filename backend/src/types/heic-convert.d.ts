@@ -1,6 +1,6 @@
 declare module 'heic-convert' {
   interface HeicConvertOptions {
-    buffer: Buffer;
+    buffer: ArrayBuffer | Buffer;
     format: 'JPEG' | 'PNG';
     quality?: number;
   }
