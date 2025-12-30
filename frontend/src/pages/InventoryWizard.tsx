@@ -1,13 +1,14 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-// Dialog imports removed - not currently used
+import { AIProgress } from '../components/ui/Progress';
 import { Input, Select } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useConfirm } from '../components/ui/ConfirmDialog';
 import { fileApi } from '../lib/fileApi';
 import { analyzeImage, findReceiptMatches } from '../lib/imageAnalysis';
+import { api } from '../lib/api';
 import { 
   useInventoryStagingStore, 
   StagedImage, 
@@ -22,7 +23,8 @@ import {
   CheckCircle, AlertTriangle, Loader2,
   Package, DollarSign, Calendar, Link2,
   X, Sparkles, Brain, Layers, Copy,
-  CheckSquare, MapPin, Check, Edit
+  CheckSquare, MapPin, Check, Edit,
+  Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -71,6 +73,17 @@ export default function InventoryWizard() {
   const [isBatchMode, setIsBatchMode] = useState(false);
   // @ts-expect-error - editingItemId getter reserved for future inline editing UI
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  
+  // Backend AI job state
+  const [useBackendAI, setUseBackendAI] = useState(true);
+  const [currentAIJobId, setCurrentAIJobId] = useState<string | null>(null);
+  const [backendOnline, setBackendOnline] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Check backend availability
+  useEffect(() => {
+    api.checkConnection().then(setBackendOnline);
+  }, []);
   
   // Initialize session if not exists
   useEffect(() => {
@@ -145,8 +158,141 @@ export default function InventoryWizard() {
     }
   }, [handleFiles]);
   
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Poll backend AI job status
+  const pollAIJobStatus = useCallback(async (jobId: string) => {
+    const result = await api.getAIJob(jobId);
+    if (!result.success || !result.job) return null;
+    
+    const job = result.job;
+    setAnalysisProgress({
+      current: job.processed_items,
+      total: job.total_items,
+      item: `Processing... (${job.processed_items}/${job.total_items})`,
+    });
+
+    if (job.status === 'completed' || job.status === 'failed') {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      
+      if (job.status === 'completed') {
+        // Process completed job results
+        toast.success('Analysis Complete', `Processed ${job.processed_items} images, created ${job.created_items} items`);
+        
+        // Mark all staged images as analyzed
+        stagedImages.forEach(img => {
+          if (img.status === 'analyzing') {
+            updateStagedImage(img.id, { status: 'analyzed' });
+          }
+        });
+        
+        updateSession({ status: 'reviewing', processedImages: job.processed_items });
+        setCurrentStep('review');
+      } else {
+        toast.error('Analysis Failed', job.error_message || 'AI processing failed');
+        stagedImages.forEach(img => {
+          if (img.status === 'analyzing') {
+            updateStagedImage(img.id, { status: 'error', errorMessage: job.error_message });
+          }
+        });
+      }
+      
+      setIsAnalyzing(false);
+      setCurrentAIJobId(null);
+    }
+    
+    return job;
+  }, [stagedImages, updateStagedImage, updateSession, toast]);
+
+  // Run backend AI analysis
+  const runBackendAnalysis = async (files: File[]) => {
+    setIsAnalyzing(true);
+    updateSession({ status: 'analyzing' });
+    
+    // Mark all images as analyzing
+    stagedImages.forEach(img => {
+      if (img.status === 'pending') {
+        updateStagedImage(img.id, { status: 'analyzing' });
+      }
+    });
+    
+    try {
+      // Batch upload with AI job creation
+      const result = await api.batchUploadImages(files, {
+        entityType: 'item',
+        entityId: 'pending',
+        createAIJob: true,
+        aiJobType: 'inventory_detection',
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+      
+      if (result.aiJobId) {
+        setCurrentAIJobId(result.aiJobId);
+        toast.info('AI Processing Started', `Job ${result.aiJobId} created for ${result.uploaded} images`);
+        
+        // Start polling for job status
+        pollIntervalRef.current = setInterval(() => {
+          pollAIJobStatus(result.aiJobId!);
+        }, 2000);
+        
+        // Initial poll
+        await pollAIJobStatus(result.aiJobId);
+      } else {
+        // No AI job created, mark as complete
+        setIsAnalyzing(false);
+        toast.warning('No AI Job', 'Images uploaded but AI processing was not started');
+      }
+    } catch (error: any) {
+      setIsAnalyzing(false);
+      toast.error('Analysis Failed', error.message);
+      stagedImages.forEach(img => {
+        if (img.status === 'analyzing') {
+          updateStagedImage(img.id, { status: 'error', errorMessage: error.message });
+        }
+      });
+    }
+  };
+
   // Run AI analysis on all pending images
   const runAnalysis = async () => {
+    // Check if we should use backend AI
+    if (useBackendAI && backendOnline) {
+      // Collect files that need analysis
+      const pendingImages = stagedImages.filter(img => img.status === 'pending');
+      if (pendingImages.length === 0) {
+        toast.info('No images', 'Upload images first');
+        return;
+      }
+      
+      // For backend analysis, we need to re-upload the files
+      // Since we already have them staged, trigger backend batch processing
+      toast.info('Using Backend AI', 'Processing with server-side AI');
+      
+      // Get files from file input or use stored file references
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput?.files && fileInput.files.length > 0) {
+        await runBackendAnalysis(Array.from(fileInput.files));
+        return;
+      }
+      
+      // Fallback to client-side if no files available for re-upload
+      toast.info('Fallback', 'Using client-side AI analysis');
+    }
+    
+    // Original client-side analysis
     if (!canAnalyze) {
       toast.error('AI not ready', aiReady.error || 'Configure AI in settings');
       return;
@@ -565,25 +711,23 @@ export default function InventoryWizard() {
         </>
       ) : (
         <Card className="p-8">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-12 h-12 mx-auto animate-spin text-primary" />
+          <div className="text-center space-y-6">
+            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
             <div>
-              <h3 className="text-lg font-semibold">Analyzing Images...</h3>
+              <h3 className="text-lg font-semibold">Analyzing Images with AI</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                {analysisProgress.current} of {analysisProgress.total}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {analysisProgress.item}
+                Detecting items, reading labels, and extracting details...
               </p>
             </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div
-                className="bg-primary h-2 rounded-full transition-all"
-                style={{
-                  width: `${(analysisProgress.current / analysisProgress.total) * 100}%`,
-                }}
-              />
-            </div>
+            <AIProgress
+              status="processing"
+              processed={analysisProgress.current}
+              total={analysisProgress.total}
+              currentItem={analysisProgress.item}
+              className="max-w-md mx-auto"
+            />
           </div>
         </Card>
       )}
@@ -764,12 +908,29 @@ export default function InventoryWizard() {
               )}
               
               {/* Image preview */}
-              <div className="aspect-video bg-muted relative">
-                <img
-                  src={fileApi.getViewUrl(item.primaryImageId)}
-                  alt={item.name}
-                  className="w-full h-full object-cover"
-                />
+              <div className="aspect-video bg-muted relative flex items-center justify-center">
+                {(() => {
+                  const stagedImg = stagedImages.find(img => img.id === item.primaryImageId);
+                  const imageUrl = stagedImg?.thumbnailUrl || fileApi.getViewUrl(item.primaryImageId);
+                  return (
+                    <>
+                      <img
+                        src={imageUrl}
+                        alt={item.name}
+                        className="w-full h-full object-cover absolute inset-0"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                      {/* Fallback placeholder */}
+                      <div className="flex flex-col items-center justify-center text-muted-foreground">
+                        <ImageIcon className="w-8 h-8 mb-1" />
+                        <span className="text-xs">Image</span>
+                      </div>
+                    </>
+                  );
+                })()}
                 {item.imageIds.length > 1 && (
                   <div className="absolute top-2 right-2 px-2 py-1 bg-black/70 rounded-full text-white text-xs">
                     <Layers className="w-3 h-3 inline mr-1" />

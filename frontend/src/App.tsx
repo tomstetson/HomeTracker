@@ -14,6 +14,12 @@ import Diagrams from './pages/Diagrams';
 import HomeInfo from './pages/HomeInfo';
 import Budget from './pages/Budget';
 import Settings from './pages/Settings';
+import Warranties from './pages/Warranties';
+import Backup from './pages/Backup';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import { ProtectedRoute, PublicOnlyRoute } from './components/ProtectedRoute';
+import { useAuthStore } from './store/authStore';
 import { ToastContainer, useToast } from './components/ui/Toast';
 import { ConfirmProvider } from './components/ui/ConfirmDialog';
 import { autoSync } from './lib/autoSync';
@@ -23,10 +29,16 @@ import { registerServiceWorker } from './lib/pwa';
 function AppContent() {
   const toast = useToast();
   const [synced, setSynced] = useState(false);
+  const { initialize, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    // Auto-sync on startup
-    if (!synced) {
+    // Initialize Supabase auth on startup
+    initialize();
+  }, [initialize]);
+
+  useEffect(() => {
+    // Auto-sync on startup (only if authenticated)
+    if (!synced && isAuthenticated) {
       autoSync().then((result) => {
         setSynced(true);
         if (result.source === 'backend') {
@@ -46,25 +58,37 @@ function AppContent() {
     if ('serviceWorker' in navigator) {
       registerServiceWorker();
     }
-  }, [synced, toast]);
+  }, [synced, toast, isAuthenticated]);
 
   return (
-    <Layout>
-      <Routes>
-        {/* Core modules - streamlined navigation */}
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/items" element={<Items />} />
-        <Route path="/inventory-wizard" element={<InventoryWizard />} />
-        <Route path="/maintenance" element={<Maintenance />} />
-        <Route path="/vendors" element={<Vendors />} />
-        <Route path="/documents" element={<Documents />} />
-        <Route path="/diagrams" element={<Diagrams />} />
-        <Route path="/home-info" element={<HomeInfo />} />
-        <Route path="/budget" element={<Budget />} />
-        <Route path="/settings" element={<Settings />} />
-      </Routes>
-    </Layout>
+    <Routes>
+      {/* Public auth routes */}
+      <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+      <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+      
+      {/* Protected routes - wrapped in Layout */}
+      <Route path="/*" element={
+        <ProtectedRoute>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/items" element={<Items />} />
+              <Route path="/inventory-wizard" element={<InventoryWizard />} />
+              <Route path="/maintenance" element={<Maintenance />} />
+              <Route path="/vendors" element={<Vendors />} />
+              <Route path="/documents" element={<Documents />} />
+              <Route path="/diagrams" element={<Diagrams />} />
+              <Route path="/home-info" element={<HomeInfo />} />
+              <Route path="/budget" element={<Budget />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/warranties" element={<Warranties />} />
+              <Route path="/backup" element={<Backup />} />
+            </Routes>
+          </Layout>
+        </ProtectedRoute>
+      } />
+    </Routes>
   );
 }
 

@@ -3,9 +3,10 @@ import { useVendorStore, Vendor } from '../store/vendorStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
-import { Input, Textarea } from '../components/ui/Input';
+import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useOptionsStore } from '../store/optionsStore';
+import { useFormMemory } from '../hooks/useFormMemory';
 import {
   Plus,
   Search,
@@ -29,7 +30,13 @@ export default function Vendors() {
   const { getOptions, addOption, removeOption, isDefault } = useOptionsStore();
   const toast = useToast();
   
+  // Form memory - remember last used category
+  const { lastUsed, rememberAll } = useFormMemory('vendors', { 
+    fields: ['category'] 
+  });
+  
   const [searchQuery, setSearchQuery] = useState('');
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [filterPreferred, setFilterPreferred] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -173,9 +180,13 @@ export default function Vendors() {
             <Settings className="w-4 h-4 mr-2" />
             Categories
           </Button>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="flex items-center space-x-2">
+          <Button onClick={() => setIsQuickAddOpen(true)} className="flex items-center space-x-2">
             <Plus className="w-4 h-4" />
-            <span>Add Vendor</span>
+            <span>Quick Add</span>
+          </Button>
+          <Button variant="outline" onClick={() => setIsAddDialogOpen(true)} className="hidden sm:flex items-center space-x-2">
+            <Edit className="w-4 h-4" />
+            <span>Detailed</span>
           </Button>
         </div>
       </div>
@@ -371,6 +382,56 @@ export default function Vendors() {
           ))}
         </div>
       )}
+
+      {/* Quick Add Vendor Dialog */}
+      <Dialog
+        open={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        title="Quick Add Vendor"
+        maxWidth="sm"
+      >
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          const category = formData.get('category') as string || 'General';
+          
+          // Remember category for next time
+          rememberAll({ category });
+          
+          const newVendor: Vendor = {
+            id: `vendor-${Date.now()}`,
+            businessName: formData.get('businessName') as string,
+            phone: formData.get('phone') as string || '',
+            category: [category],
+            rating: 0,
+            totalJobs: 0,
+            isPreferred: false,
+          };
+          addVendor(newVendor);
+          setIsQuickAddOpen(false);
+          toast.success('Vendor Added', `"${newVendor.businessName}" added`);
+        }}>
+          <div className="space-y-4">
+            <Input name="businessName" label="Business Name" required placeholder="e.g., Joe's Plumbing" autoFocus />
+            <div className="grid grid-cols-2 gap-4">
+              <Input name="phone" label="Phone" type="tel" placeholder="215-555-0101" />
+              <Select
+                name="category"
+                label="Category"
+                defaultValue={lastUsed.category}
+                options={vendorCategories.map(c => ({ value: c, label: c }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsQuickAddOpen(false)}>Cancel</Button>
+            <Button type="submit">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Vendor
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
 
       {/* Add Vendor Dialog */}
       <Dialog

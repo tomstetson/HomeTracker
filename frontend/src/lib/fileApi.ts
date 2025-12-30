@@ -1,6 +1,20 @@
 // File API service for uploading and managing documents with OCR
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+// Dynamically determine API URL based on current browser location
+function getApiUrl(): string {
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl) return envUrl;
+  
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `http://${hostname}:3001`;
+    }
+  }
+  return 'http://localhost:3001';
+}
+
+const API_URL = getApiUrl();
 
 export interface StoredFile {
   id: string;
@@ -148,6 +162,11 @@ export const fileApi = {
     return `${getBaseUrl()}/api/files/${id}/view`;
   },
 
+  // Get thumbnail URL for a file
+  getThumbnailUrl(id: string): string {
+    return `${getBaseUrl()}/api/files/${id}/thumbnail`;
+  },
+
   // Format file size for display
   formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 B';
@@ -178,6 +197,7 @@ export const fileApi = {
 };
 
 export default fileApi;
+
 
 
 

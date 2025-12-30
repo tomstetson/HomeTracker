@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { useFormMemory } from '../hooks/useFormMemory';
 import {
   Plus,
   CheckCircle2,
@@ -42,9 +43,15 @@ export default function Maintenance() {
   const { vendors } = useVendorStore();
   const toast = useToast();
   
+  // Form memory - remember last used category and priority
+  const { lastUsed, rememberAll } = useFormMemory('maintenance', { 
+    fields: ['category', 'priority'] 
+  });
+  
   const [viewMode, setViewMode] = useState<ViewMode>('tasks');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('list');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<MaintenanceTask | null>(null);
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
@@ -656,13 +663,19 @@ export default function Maintenance() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Maintenance</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Track tasks and service history</p>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} size="sm" className="sm:hidden">
-            <Plus className="w-4 h-4" />
-          </Button>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="hidden sm:flex">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Task
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setIsQuickAddOpen(true)} size="sm" className="sm:hidden">
+              <Plus className="w-4 h-4" />
+            </Button>
+            <Button onClick={() => setIsQuickAddOpen(true)} className="hidden sm:flex">
+              <Plus className="w-4 h-4 mr-2" />
+              Quick Add
+            </Button>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(true)} className="hidden sm:flex">
+              <Wrench className="w-4 h-4 mr-2" />
+              Detailed
+            </Button>
+          </div>
         </div>
         
         {/* View controls */}
@@ -1021,8 +1034,56 @@ export default function Maintenance() {
         </p>
       )}
 
-      {/* Add Task Dialog */}
-      <Dialog open={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} title="Add Task" maxWidth="lg">
+      {/* Quick Add Task Dialog */}
+      <Dialog open={isQuickAddOpen} onClose={() => setIsQuickAddOpen(false)} title="Quick Add Task" maxWidth="sm">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + 7); // Default to 1 week from now
+          
+          const category = formData.get('category') as string || 'General';
+          const priority = formData.get('priority') as string || 'medium';
+          
+          // Remember category and priority for next time
+          rememberAll({ category, priority });
+          
+          addTask({
+            id: Date.now().toString(),
+            title: formData.get('title') as string,
+            category,
+            priority: priority as any,
+            status: 'pending',
+            dueDate: formData.get('dueDate') as string || dueDate.toISOString().split('T')[0],
+          });
+          setIsQuickAddOpen(false);
+          toast.success('Task Added', `"${formData.get('title')}" created`);
+        }}>
+          <div className="space-y-4">
+            <Input name="title" label="What needs to be done?" required placeholder="e.g., Replace HVAC filter" autoFocus />
+            <div className="grid grid-cols-2 gap-4">
+              <Input name="category" label="Category" defaultValue={lastUsed.category} placeholder="e.g., HVAC" />
+              <Select name="priority" label="Priority" defaultValue={lastUsed.priority || 'medium'} options={[
+                { value: 'low', label: 'Low' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'high', label: 'High' },
+                { value: 'urgent', label: 'Urgent' },
+              ]} />
+            </div>
+            <Input name="dueDate" label="Due Date" type="date" />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsQuickAddOpen(false)}>Cancel</Button>
+            <Button type="submit">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Task
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+
+      {/* Add Task Dialog (Detailed) */}
+      <Dialog open={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} title="Add Task (Detailed)" maxWidth="lg">
         <form onSubmit={handleAddTask}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input name="title" label="Title" required placeholder="Replace HVAC Filter" className="sm:col-span-2" />

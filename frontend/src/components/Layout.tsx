@@ -19,6 +19,8 @@ import {
   PenTool,
   Wallet,
   MapPin,
+  Shield,
+  HardDrive,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useTheme } from '../lib/theme';
@@ -26,6 +28,8 @@ import { getAllData } from '../lib/storage';
 import DataManager from './DataManager';
 import GlobalSearch from './GlobalSearch';
 import NotificationPanel from './NotificationPanel';
+import { MobileNav } from './MobileNav';
+import { OfflineIndicator } from './OfflineIndicator';
 
 // Hook to get property info from consolidated storage
 function usePropertyInfo() {
@@ -91,12 +95,14 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Projects', href: '/projects', icon: FolderKanban },
     { name: 'Inventory', href: '/items', icon: Package },
+    { name: 'Warranties', href: '/warranties', icon: Shield },
     { name: 'Maintenance', href: '/maintenance', icon: Wrench },
     { name: 'Vendors', href: '/vendors', icon: Users },
     { name: 'Documents', href: '/documents', icon: FileText },
     { name: 'Diagrams', href: '/diagrams', icon: PenTool },
     { name: 'Home Info', href: '/home-info', icon: Building2 },
     { name: 'Budget', href: '/budget', icon: Wallet },
+    { name: 'Backup', href: '/backup', icon: HardDrive },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
@@ -405,6 +411,12 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Data Manager */}
       <DataManager isOpen={isDataManagerOpen} onClose={() => setIsDataManagerOpen(false)} />
+
+      {/* Mobile Bottom Navigation */}
+      <MobileNav />
+
+      {/* Offline Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

@@ -1,564 +1,405 @@
 # HomeTracker - AI Assistant Context File
 
-> **Purpose**: This file provides continuity for AI coding assistants (Claude Code, Cursor, Windsurf, etc.) to understand the project's current state, implemented features, and future roadmap.
+> **Purpose**: This file provides continuity for AI coding assistants (Claude, Cursor, Windsurf, etc.) to understand the project's current state, architecture, and roadmap.
 > 
-> **Last Updated**: 2024-12-22 | **Version**: 2.0.0
+> **Last Updated**: 2024-12-30 | **Version**: 2.0.0
 
 ---
 
-## 🚀 SESSION SUMMARY: Dec 22, 2024 - Major SQLite & Storage Architecture Upgrade
+## 📍 CURRENT STATUS: v2.0 Phase 2.1-2.4 Complete
 
-### What Was Accomplished
+### Release State
+- **v1.0**: ✅ Complete
+- **v2.0 Phase 2.1-2.4**: ✅ Complete (UX, Auth, Automation, Mobile)
+- **v2.0 Phase 2.5**: ⏳ Planned (Maple AI Assistant)
 
-This session implemented a **complete backend storage overhaul** transforming HomeTracker from a simple JSON-file app into a scalable, AI-powered home management system ready for homelab deployment.
+### Key Documents
+| Document | Purpose |
+|----------|---------|
+| `docs/V2_ROADMAP.md` | v2.0 phased roadmap with Maple |
+| `docs/QUICKSTART.md` | 5-minute setup guide |
+| `docs/DEPLOYMENT.md` | Full deployment guide |
 
-#### 1. SQLite Database Implementation (`database.service.ts`)
-- **Full relational schema** with 15+ tables
-- WAL mode for performance
-- FTS5 full-text search on inventory items
-- Automatic schema migrations with versioning
-- Tables: users, properties, items, images, ai_jobs, projects, vendors, maintenance_tasks, documents, warranties, transactions, budgets, diagrams, categories, settings, sync_log
+---
 
-#### 2. Image Storage System (`image-storage.service.ts`)
-- Single and batch image uploads (100+ at once)
-- Automatic thumbnail generation via Sharp
-- EXIF rotation handling
-- Base64 encoding for AI APIs
-- Storage stats and orphan cleanup
+## 🚀 COMPLETED: Phase 2.1-2.4 (Dec 2024)
 
-#### 3. AI Batch Processing (`ai-batch-processor.service.ts`)
-- **BYOK Support**: OpenAI, Anthropic, Google
-- **Analysis Types**:
-  - `inventory_detection` - Auto-create items with category, brand, condition
-  - `warranty_detection` - Extract warranty info from labels/receipts
-  - `appliance_identification` - Identify tools/appliances + maintenance schedules
-  - `receipt_scan` - Parse purchase receipts
-  - `condition_assessment` - Assess item condition
-- Job queue with progress tracking
-- Auto-create inventory items from analysis
-- Cost estimation per job
+### Phase 2.1: UX Polish ✅
 
-#### 4. Storage Provider System (`storage-providers/`)
-- **Pluggable architecture** for multiple backends
-- `LocalStorageProvider` - Default, always available
-- `WebDAVStorageProvider` - NAS support (Synology, QNAP, Nextcloud)
-- Easy to extend with S3, Google Drive, OneDrive
+#### 1. New UI Components Created
 
-#### 5. Backup Scheduler (`backup-scheduler.service.ts`)
-- Cron-based automated backups
-- Multi-provider destinations
-- Configurable retention policies
-- Compression (gzip) support
-- Progress tracking and logging
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `FormSection` | `components/ui/FormSection.tsx` | Collapsible form sections with expand/collapse, icons, badges, data indicators |
+| `ImageWithFallback` | `components/ui/ImageWithFallback.tsx` | Smart image loading with skeleton states and graceful error fallback |
+| `Progress` | `components/ui/Progress.tsx` | Progress bars + `AIProgress` component for AI job status display |
+| `useFormMemory` | `hooks/useFormMemory.ts` | Hook for remembering last-used form values (category, location) |
 
-### New API Endpoints
+#### 2. Items.tsx Improvements
+- **Quick Add is now primary action** - Button reordered, more prominent
+- **Collapsible form sections** - Add Item dialog uses `FormSection` for:
+  - Photos (shows badge with count)
+  - Purchase Details (brand, model, price, dates)
+  - Warranty (provider, dates, coverage)
+  - Replacement Tracking (consumables)
+- **Basic info always visible** - Name, Category, Location, Condition
+- **Mobile-responsive header** - Buttons wrap properly on small screens
 
-```
-# Images
-POST /api/images/upload           # Single image
-POST /api/images/batch-upload     # Batch with AI job creation
-GET  /api/images/:id              # Get image
-GET  /api/images/:id/thumbnail    # Get thumbnail
+#### 3. Maintenance.tsx Improvements
+- **Quick Add Task dialog** - Minimal fields: title, category, priority, due date
+- **Defaults to 1 week** from today if no date selected
+- **Primary/secondary buttons** - Quick Add prominent, Detailed as outline
 
-# AI Jobs
-POST /api/ai-jobs                 # Create analysis job
-GET  /api/ai-jobs/:id             # Job status
-POST /api/ai-jobs/configure       # Set AI provider
-POST /api/ai-jobs/analyze-single  # Single image analysis
+#### 4. Budget.tsx Improvements
+- **Quick Add Transaction dialog** - Type, amount, description, category, date
+- **Validation** - Amount must be > 0
+- **Smart defaults** - Today's date pre-filled
 
-# Storage & Backup
-POST /api/storage/providers/webdav   # Configure NAS
-GET  /api/storage/providers          # List providers
-POST /api/storage/schedules          # Create backup schedule
-POST /api/storage/schedules/:id/run  # Run backup now
-GET  /api/storage/backups            # List all backups
-```
-
-### Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        HomeTracker v2.0                         │
-├─────────────────────────────────────────────────────────────────┤
-│  SQLite Database (WAL mode)                                     │
-│  ├── items + FTS5 search                                        │
-│  ├── images with AI metadata                                    │
-│  ├── ai_jobs / ai_job_items (batch processing)                  │
-│  ├── warranties (linked to items)                               │
-│  └── maintenance_tasks (with AI suggestions)                    │
-├─────────────────────────────────────────────────────────────────┤
-│  Storage Providers (pluggable)                                  │
-│  ├── LocalStorageProvider (default)                             │
-│  ├── WebDAVStorageProvider (NAS: Synology/QNAP/Nextcloud)       │
-│  └── [Future: S3, Google Drive, OneDrive]                       │
-├─────────────────────────────────────────────────────────────────┤
-│  Backup Scheduler                                               │
-│  ├── Cron-based automation                                      │
-│  ├── Multi-provider destinations                                │
-│  └── Retention policies + compression                           │
-├─────────────────────────────────────────────────────────────────┤
-│  AI Batch Processor (BYOK)                                      │
-│  ├── inventory_detection    → Auto-create items                 │
-│  ├── warranty_detection     → Extract warranty info             │
-│  ├── appliance_identification → Tools + maintenance schedules   │
-│  └── Providers: OpenAI, Anthropic, Google                       │
-└─────────────────────────────────────────────────────────────────┘
-```
+#### 5. ImageGallery.tsx Improvements
+- **ItemThumbnail** now handles image load errors gracefully
+- Error state shows placeholder instead of broken image
+- Reset error state when image URL changes
 
 ### Files Created/Modified
 
-| File | Type | Purpose |
+| File | Type | Changes |
 |------|------|---------|
-| `backend/src/services/database.service.ts` | New | SQLite schema + migrations |
-| `backend/src/services/image-storage.service.ts` | New | Image upload + thumbnails |
-| `backend/src/services/ai-batch-processor.service.ts` | New | AI batch processing |
-| `backend/src/services/backup-scheduler.service.ts` | New | Automated backups |
-| `backend/src/services/storage-providers/index.ts` | New | Provider interface |
-| `backend/src/services/storage-providers/local.provider.ts` | New | Local filesystem |
-| `backend/src/services/storage-providers/webdav.provider.ts` | New | NAS/WebDAV |
-| `backend/src/routes/images.routes.ts` | New | Image API |
-| `backend/src/routes/ai-jobs.routes.ts` | New | AI jobs API |
-| `backend/src/routes/storage.routes.ts` | New | Storage/backup API |
-| `backend/src/server.ts` | Modified | Added new routes |
-| `backend/Dockerfile` | Modified | Added Sharp/SQLite deps |
-| `docker-compose.yml` | Modified | Image volumes, AI env vars |
-| `docs/STORAGE_ARCHITECTURE_RECOMMENDATIONS.md` | New | Architecture doc |
+| `frontend/src/components/ui/FormSection.tsx` | **NEW** | Collapsible form sections |
+| `frontend/src/components/ui/ImageWithFallback.tsx` | **NEW** | Smart image loading |
+| `frontend/src/components/ui/Progress.tsx` | **NEW** | Progress bars + AI progress |
+| `frontend/src/hooks/useFormMemory.ts` | **NEW** | Form value memory |
+| `frontend/src/pages/Items.tsx` | Modified | Quick Add primary, collapsible sections |
+| `frontend/src/pages/Maintenance.tsx` | Modified | Quick Add dialog added |
+| `frontend/src/pages/Budget.tsx` | Modified | Quick Add dialog added |
+| `frontend/src/components/ImageGallery.tsx` | Modified | Better error handling |
 
-### Dependencies Added (Backend)
-- `better-sqlite3` - SQLite database
-- `sharp` - Image processing
-- `webdav` - NAS connectivity
-- `node-cron` - Scheduled backups
-- `uuid` - ID generation
+### What's Next
 
-### What's Next (Recommended Priority)
-
-1. **Frontend Image Upload Component** - Create unified upload UI for inventory/warranty
-2. **Frontend AI Job Status UI** - Show progress, results, create items from analysis
-3. **Frontend Storage Settings** - Configure NAS, view backups, run manual backup
-4. **Integrate AI into Inventory Page** - Batch upload photos → auto-categorize
-5. **Integrate AI into Warranty Page** - Scan warranty cards/receipts
-
-### Docker Deployment Ready
-
-```bash
-# Configure NAS backup
-curl -X POST http://localhost:3001/api/storage/providers/webdav \
-  -d '{"name":"nas","url":"https://nas.local:5006","username":"user","password":"pass"}'
-
-# Create daily backup schedule  
-curl -X POST http://localhost:3001/api/storage/schedules \
-  -d '{"name":"Daily NAS","provider":"nas","schedule":"0 2 * * *","retentionDays":30}'
-
-# Batch upload inventory photos with AI analysis
-curl -X POST http://localhost:3001/api/images/batch-upload \
-  -F "images=@photo1.jpg" -F "images=@photo2.jpg" \
-  -F "entityType=item" -F "createAIJob=true"
-```
+From v2.0 Roadmap Phase 2.1 remaining:
+1. **Integrate useFormMemory** - Remember last category/location
+2. **Enhanced Global Search** - Category grouping in results
+3. **AI Progress indicators** - Use new Progress component in AI operations
 
 ---
 
-## 🏠 Project Overview
-
-**HomeTracker** is a self-hosted home management application designed for homelabbers. It provides a single source of truth for tracking all aspects of home ownership including projects, inventory, maintenance, warranties, vendors, documents, diagrams, and budgets.
+## 🏗️ Architecture Overview
 
 ### Tech Stack
-- **Frontend**: React 18, TypeScript, Vite 7, Tailwind CSS, Zustand (state management)
-- **Backend**: Node.js 20, Express.js, SQLite (better-sqlite3), Sharp (images)
-- **Database**: SQLite with WAL mode, FTS5 full-text search
-- **Storage**: SQLite DB + JSON export + Image files (local/NAS/cloud)
-- **Deployment**: Docker (multi-stage build), Nginx, Supervisor
-- **Special Libraries**: tldraw (diagrams), mermaid (code diagrams), Tesseract.js (OCR), DOMPurify (XSS protection)
-- **AI Integration**: BYOK (Bring Your Own Key) support for OpenAI, Anthropic (Claude), Google Gemini
-- **Security**: ESLint security plugin, Secretlint, OSV Scanner, Semgrep (CI), Gitleaks, Trivy
+```
+Frontend:  React 18 + TypeScript + Vite + Tailwind CSS + Zustand
+Backend:   Node.js + Express + SQLite (better-sqlite3) + Sharp
+AI:        BYOK (OpenAI, Anthropic, Google) - user provides API keys
+Storage:   SQLite DB + Local files + WebDAV (NAS backup)
+Deploy:    Docker (single container) + Nginx + Supervisor
+```
 
-### Key Directories
+### Database (SQLite with WAL mode)
+```
+Core Tables:
+├── users, properties (multi-user ready)
+├── items (FTS5 search), images
+├── projects, vendors, maintenance_tasks
+├── documents, warranties
+├── transactions, budgets
+├── diagrams, categories, settings
+└── ai_jobs, ai_job_items (batch processing)
+```
+
+### Directory Structure
 ```
 HomeTracker/
-├── frontend/              # React frontend application
+├── frontend/
 │   ├── src/
-│   │   ├── components/    # Reusable UI components
-│   │   ├── pages/         # Main page components (11 pages)
-│   │   ├── store/         # Zustand stores (14 stores)
-│   │   ├── lib/           # Utilities, services, API helpers
-│   │   └── test/          # Test setup and utilities
-├── backend/               # Express.js backend
+│   │   ├── components/     # UI components
+│   │   │   └── ui/         # Reusable primitives (Button, Dialog, FormSection, etc.)
+│   │   ├── pages/          # Route components (12 pages)
+│   │   ├── store/          # Zustand stores (14 stores)
+│   │   ├── hooks/          # Custom hooks (useFormMemory, etc.)
+│   │   └── lib/            # Utils, API client, AI service
+├── backend/
 │   ├── src/
-│   │   ├── services/      # Business logic (excel, file, email, maintenance-checker)
-│   │   └── routes/        # API routes (12 route files)
-├── docs/                  # Documentation (7 docs)
-├── docker/                # Docker configs, nginx, supervisor
-├── scripts/               # PowerShell scripts (security-audit)
-└── .github/workflows/     # CI/CD (ci.yml, security.yml)
+│   │   ├── services/       # Business logic
+│   │   │   ├── database.service.ts
+│   │   │   ├── image-storage.service.ts
+│   │   │   ├── ai-batch-processor.service.ts
+│   │   │   ├── backup-scheduler.service.ts
+│   │   │   └── storage-providers/
+│   │   └── routes/         # API endpoints
+├── docs/                   # Documentation
+└── docker/                 # Docker configs
 ```
 
 ---
 
-## 🔒 Security Infrastructure
+## 📊 Feature Modules
 
-### Local Security Tools
-| Tool | Purpose | Command |
-|------|---------|---------|
-| **npm audit** | Dependency vulnerabilities | `npm audit` |
-| **OSV Scanner** | Google's vulnerability DB | `osv-scanner --lockfile package-lock.json` |
-| **Secretlint** | Secret detection | `npx secretlint "src/**/*"` |
-| **ESLint Security** | Code security patterns | `npm run lint` |
+### Frontend Pages (12)
 
-### CI/CD Security (GitHub Actions)
-- **security.yml**: OSV Scanner, Semgrep, Trivy, Gitleaks, npm audit
-- **ci.yml**: Tests, linting, secretlint, builds
+| Page | Route | Key Features |
+|------|-------|--------------|
+| Dashboard | `/` | Stats, quick actions, AI widget |
+| Projects | `/projects` | Kanban board, subtasks, budgets |
+| Inventory | `/items` | **Quick Add**, collapsible forms, images, warranties |
+| Inventory Wizard | `/inventory-wizard` | AI-powered batch item creation |
+| Warranties | `/warranties` | AI document scanning |
+| Maintenance | `/maintenance` | **Quick Add**, recurring tasks, history |
+| Vendors | `/vendors` | Directory, ratings, categories |
+| Documents | `/documents` | Upload, OCR, AI extraction |
+| Diagrams | `/diagrams` | TLDraw + Mermaid editors |
+| Home Info | `/home-info` | Property, paint colors, emergency contacts |
+| Budget | `/budget` | **Quick Add**, transactions, analytics |
+| Backup | `/backup` | Providers, schedules, restore |
+| Settings | `/settings` | Theme, AI config, data management |
 
-### Pre-commit Hooks (Husky + lint-staged)
-- Secretlint on all staged files
-- npm audit on backend/frontend changes
+### Backend APIs
 
-### Running Full Security Audit
-```powershell
-.\scripts\security-audit.ps1        # Full audit
-.\scripts\security-audit.ps1 -Fix   # Auto-fix npm vulnerabilities
-```
-
----
-
-## ✅ Implemented Features (v1.8.0)
-
-### Core Modules
-
-| Module | File | Key Features |
-|--------|------|--------------|
-| **Dashboard** | `pages/Dashboard.tsx` | Stats cards, quick actions, recent projects, needs attention |
-| **Projects** | `pages/Projects.tsx` | Kanban board (5 columns), drag-drop, subtasks, tags, budgets, mobile list view |
-| **Inventory** | `pages/Items.tsx` | Items with warranties, categories, sell tracking, soft delete/trash (180-day retention) |
-| **Inventory Wizard** | `pages/InventoryWizard.tsx` | Step-by-step guided inventory creation |
-| **Maintenance** | `pages/Maintenance.tsx` | Tasks/History tabs, list/card views, recurring tasks, skip cycle, undo complete |
-| **Vendors** | `pages/Vendors.tsx` | Vendor directory with ratings, custom categories, preferred filter |
-| **Documents** | `pages/Documents.tsx` | File upload, OCR text extraction, category filtering, AI extraction |
-| **Diagrams** | `pages/Diagrams.tsx` | tldraw editor, Mermaid code diagrams, zoom controls, PNG/SVG export, inventory integration, 7 diagram types, keyboard shortcuts |
-| **Home Info** | `pages/HomeInfo.tsx` | Property details, value tracking, paint colors, emergency contacts |
-| **Budget** | `pages/Budget.tsx` | Transaction tracking, income/expenses, category budgets, analytics, recurring transactions |
-| **Settings** | `pages/Settings.tsx` | Theme toggle, API privacy, data export/import, backup, notification preferences |
-
-### State Management (Zustand Stores)
-
-| Store | File | Purpose |
-|-------|------|---------|
-| `useProjectStore` | `store/projectStore.ts` | Projects with subtasks |
-| `useInventoryStore` | `store/inventoryStore.ts` | Items, categories, warranties, sales |
-| `useMaintenanceStore` | `store/maintenanceStore.ts` | Tasks, history, service records |
-| `useVendorStore` | `store/vendorStore.ts` | Vendor directory |
-| `useDocumentStore` | `store/documentStore.ts` | Document metadata, OCR text |
-| `useDiagramStore` | `store/diagramStore.ts` | Diagrams with tldraw/Mermaid data |
-| `useHomeVitalsStore` | `store/homeVitalsStore.ts` | Property info, emergency contacts |
-| `useOptionsStore` | `store/optionsStore.ts` | User-customizable dropdown options |
-| `useWarrantyStore` | `store/warrantyStore.ts` | Standalone warranties (legacy) |
-| `useAISettingsStore` | `store/aiSettingsStore.ts` | AI provider config, BYOK API keys |
-| `useBudgetStore` | `store/budgetStore.ts` | Transactions, budgets, analytics |
-| `useNotificationStore` | `store/notificationStore.ts` | In-app notifications, preferences |
-| `usePropertyValueStore` | `store/propertyValueStore.ts` | Home value history tracking |
-
-### UI Components
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| `Layout` | `components/Layout.tsx` | App shell with sidebar navigation |
-| `GlobalSearch` | `components/GlobalSearch.tsx` | Ctrl+K search dialog with AI natural language |
-| `AIQueryPanel` | `components/AIQueryPanel.tsx` | Reusable AI chat component for any page |
-| `MermaidAIAssistant` | `components/MermaidAIAssistant.tsx` | AI chat for diagram help |
-| `DocumentExtractionModal` | `components/DocumentExtractionModal.tsx` | AI-powered document data extraction |
-| `EditableSelect` | `components/ui/EditableSelect.tsx` | Dropdowns with add/edit/remove |
-| `TagInput` | `components/ui/TagInput.tsx` | Tag management with suggestions |
-| `Toast` | `components/ui/Toast.tsx` | Notification system |
-
-### AI Services (lib/)
-
-| Service | File | Purpose |
-|---------|------|---------|
-| `homeContext.ts` | `lib/homeContext.ts` | Aggregates all stores into AI-ready context |
-| `aiService.ts` | `lib/aiService.ts` | LLM API calls, prompts, response parsing |
-
-### Backend Services
-
-| Service | File | Purpose |
-|---------|------|---------|
-| `excel.service.ts` | `backend/src/services/` | Real-time Excel export |
-| `file.service.ts` | `backend/src/services/` | File upload, OCR processing |
-| `sync.routes.ts` | `backend/src/routes/` | Data synchronization API |
-| `email.service.ts` | `backend/src/services/` | Email notifications |
-| `maintenance-checker.service.ts` | `backend/src/services/` | Daily maintenance checks |
-
-### Diagram System Categories
-
-The diagram system (`diagramStore.ts`) supports these categories:
-- `network` - Network Diagram 🌐
-- `plumbing` - Plumbing Layout 🚿
-- `electrical` - Electrical Layout ⚡
-- `floor-plan` - Floor Plan 🏠
-- `hvac` - HVAC System ❄️
-- `yard` - Yard / Landscape 🌳
-- `other` - Other 📋
+| Route | Purpose |
+|-------|---------|
+| `/api/items/*` | Inventory CRUD |
+| `/api/images/*` | Upload, thumbnails, batch |
+| `/api/ai-jobs/*` | AI batch processing |
+| `/api/storage/*` | Backup management |
+| `/api/files/*` | Document upload/OCR |
+| `/api/maintenance/*` | Task management |
+| `/api/vendors/*` | Vendor directory |
+| `/api/projects/*` | Project management |
 
 ---
 
-## 🔧 Current Data Models
+## 🎯 v2.0 Roadmap Progress
 
-### InventoryItem (inventoryStore.ts)
-```typescript
-interface InventoryItem {
-  id: string;
-  name: string;
-  category: string;
-  brand?: string;
-  modelNumber?: string;
-  serialNumber?: string;
-  location: string;          // Where the item is located
-  purchaseDate?: string;
-  purchasePrice?: number;
-  currentValue?: number;
-  condition: 'excellent' | 'good' | 'fair' | 'poor';
-  notes?: string;
-  photos: string[];
-  tags: string[];
-  warranty?: ItemWarranty;   // Embedded warranty
-  status: 'active' | 'sold' | 'deleted';
-  sale?: SaleRecord;         // For sold items
-  consumableInfo?: ConsumableInfo; // For replacement parts
-  deletedAt?: string;        // Soft delete timestamp
-}
+### Phase 2.1: UX Polish (Complete)
+| Task | Status |
+|------|--------|
+| FormSection component | ✅ Complete |
+| ImageWithFallback component | ✅ Complete |
+| Progress/AIProgress component | ✅ Complete |
+| useFormMemory hook | ✅ Complete |
+| Items.tsx Quick Add + form memory | ✅ Complete |
+| Items.tsx collapsible sections | ✅ Complete |
+| Maintenance.tsx Quick Add + form memory | ✅ Complete |
+| Budget.tsx Quick Add + form memory | ✅ Complete |
+| Projects.tsx Quick Add + form memory | ✅ Complete |
+| Vendors.tsx Quick Add + form memory | ✅ Complete |
+| Image loading states | ✅ Complete |
+| AIProgress in InventoryWizard | ✅ Complete |
+| Enhanced global search (grouping) | ✅ Already implemented |
 
-interface ConsumableInfo {
-  isConsumable: boolean;                    // This is a consumable/replacement part
-  replacementStorageLocation?: string;      // Where spares are stored (e.g., "Garage cabinet")
-  stockQuantity?: number;                   // How many spares on hand
-  reorderUrl?: string;                      // URL to reorder (Amazon, etc.)
-  reorderThreshold?: number;                // Alert when stock drops below this
-  linkedApplianceId?: string;               // ID of the appliance this part is for
-  replacementIntervalMonths?: number;       // How often to replace (e.g., 6 months)
-  lastReplacedDate?: string;                // When it was last replaced
-  nextReplacementDate?: string;             // Auto-calculated next replacement
-}
-```
+### Phase 2.2: Multi-User Foundation (Complete - Optional Auth)
+| Task | Status |
+|------|--------|
+| Auth scaffolding (Supabase-ready) | ✅ Complete |
+| Auth store (Zustand) | ✅ Complete |
+| Login/Register pages | ✅ Complete |
+| Protected routes wrapper | ✅ Complete |
+| Backend auth middleware | ✅ Complete |
+| Auth toggle (disabled by default) | ✅ Complete |
+| Property sharing UI | ⏳ Pending |
 
-### MaintenanceTask (maintenanceStore.ts)
-```typescript
-interface MaintenanceTask {
-  id: string;
-  title: string;
-  description?: string;
-  category: string;
-  priority: 'urgent' | 'high' | 'medium' | 'low';
-  dueDate: string;
-  recurrence?: 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'none';
-  status: 'pending' | 'completed';
-  assignedTo?: string;
-  estimatedCost?: number;
-  actualCost?: number;
-  completedDate?: string;
-  completedBy?: string;
-  completionNotes?: string;
-  serviceHistory?: ServiceHistoryEntry[];
-}
-```
+**Authentication Mode:**
+- **Default:** Auth DISABLED (homelab single-user mode)
+- **Optional:** Enable Supabase Auth for multi-user
 
-### Project (projectStore.ts)
-```typescript
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  status: 'backlog' | 'planning' | 'in-progress' | 'on-hold' | 'completed';
-  priority: 'high' | 'medium' | 'low';
-  budget: number;
-  actualCost: number;
-  startDate: string;
-  endDate: string;
-  progress: number;
-  tags: string[];
-  subtasks?: Subtask[];
-}
-```
+**To Enable Auth:**
+1. Create a Supabase project at https://supabase.com
+2. Copy `.env.example` to `.env` in both `frontend/` and `backend/`
+3. Set `AUTH_ENABLED=true` (backend) and `VITE_AUTH_ENABLED=true` (frontend)
+4. Add your Supabase URL and keys
+5. Restart both servers
+
+### Phase 2.3: Smart Automation (Complete)
+| Task | Status |
+|------|--------|
+| Backend notification scheduler service | ✅ Complete |
+| Notifications database table | ✅ Complete |
+| Notifications API routes | ✅ Complete |
+| Warranty expiration checks | ✅ Complete |
+| Maintenance due reminders | ✅ Complete |
+| Project deadline alerts | ✅ Complete |
+| Predictive maintenance (neglected items) | ✅ Complete |
+| AI suggestions service | ✅ Complete |
+| Category auto-suggest | ✅ Complete |
+| Maintenance task suggestions | ✅ Complete |
+| Similar items finder | ✅ Complete |
+
+**AI Suggestions API:**
+- `GET /api/suggestions/category?name=...` - Auto-suggest category
+- `GET /api/suggestions/maintenance?name=...` - Suggest maintenance tasks
+- `GET /api/suggestions/predictive` - Get predictive recommendations
+- `GET /api/suggestions/similar?name=...` - Find similar items
+
+### Smoke Test (Dec 30, 2024) ✅
+**Fixes Applied:**
+- `notification-scheduler.service.ts`: Fixed column names (`last_completed`, `related_item_id`, `due_date`)
+- `ai-suggestions.service.ts`: Fixed 4 SQL queries to join categories table properly
+- `server.ts`: Mounted missing `/api/dashboard` routes
+- `frontend/package.json`: Added `"type": "module"` to fix postcss warning
+
+**Performance Results:**
+| Metric | Value |
+|--------|-------|
+| API response time | 0.1-0.3ms (cached), 5-9ms (cold) |
+| Backend memory | ~290MB |
+| Frontend memory | ~175MB |
+| Boot time | <6 seconds |
+| All 15+ endpoints | ✅ 200 OK |
+
+### Phase 2.4: Mobile Experience (Complete)
+| Task | Status |
+|------|--------|
+| PWA manifest + service worker | ✅ Configured |
+| API caching (NetworkFirst) | ✅ Configured |
+| Image caching (CacheFirst) | ✅ Configured |
+| BottomSheet component | ✅ Complete |
+| ActionSheet component | ✅ Complete |
+| MobileNav (bottom tab bar) | ✅ Complete |
+| Quick Add FAB | ✅ Complete |
+| Safe area support | ✅ Complete |
+| SwipeableRow component | ✅ Complete |
+| PullToRefresh component | ✅ Complete |
+| OfflineIndicator component | ✅ Complete |
+
+**Mobile Components:**
+- `BottomSheet.tsx` - Draggable sheet with snap points
+- `ActionSheet.tsx` - Quick action menu
+- `MobileNav.tsx` - Bottom tab bar with FAB
+- `SwipeableRow.tsx` - Swipe-to-action for list items
+- `PullToRefresh.tsx` - Pull down to refresh content
+- `OfflineIndicator.tsx` - Network status banner
+
+### Phase 2.5: Maple AI Assistant (Planned)
+| Task | Status |
+|------|--------|
+| Maple chat UI component | ⏳ Pending |
+| Context-aware conversation engine | ⏳ Pending |
+| App feature knowledge base | ⏳ Pending |
+| Natural language commands | ⏳ Pending |
+| Item/project/maintenance queries | ⏳ Pending |
+| Smart suggestions via chat | ⏳ Pending |
+| Voice input support | ⏳ Pending |
+
+**Maple Features (Planned):**
+- 🍁 Context-aware chatbot branded "Maple"
+- Understands all HomeTracker features and data
+- Natural language queries: "Show me items expiring soon", "What maintenance is due?"
+- Smart actions: "Add a new refrigerator to kitchen inventory"
+- Integrated with AI suggestions service
+- BYOK support (OpenAI, Anthropic, Google, local LLMs)
+- Conversation history and memory
 
 ---
 
-## 📋 TODO - Features to Implement
+## 🔧 Development Commands
 
-### High Priority
-- [x] ~~**Inventory Part Storage Location** - Track where replacement parts are stored (e.g., "garage cabinet") for maintenance reminders~~ ✅ v1.4.0
-- [ ] **Maintenance Notifications** - Email/SMS alerts when maintenance is due (with part location info)
-- [ ] **PWA Support** - Progressive Web App for mobile installation
-- [x] ~~**Recurring Inventory Items** - Track consumables (filters, batteries) with restock reminders~~ ✅ v1.4.0
-
-### Medium Priority
-- [ ] **Floor Plan Templates** - Pre-built floor plan shapes in diagram editor
-- [ ] **Multi-Property Support** - Manage multiple homes/properties
-- [x] ~~**Receipt Scanning** - OCR with automatic data extraction~~ ✅ v1.7.0 (Document Intelligence)
-- [ ] **Vendor Reviews** - Rate vendors after service calls
-- [ ] **Budget Tracking** - Overall home budget with category breakdown
-
-### Low Priority / Future
-- [ ] **Multi-User Support** - Family member accounts
-- [ ] **PostgreSQL Backend** - Optional database for larger deployments
-- [ ] **Mobile App** - Native iOS/Android apps
-- [ ] **Smart Home Integration** - Connect to Home Assistant, Google Home
-
----
-
-## 🧪 Testing Notes
-
-### Manual Test Checklist
-1. **Dashboard** - Stats accurate, quick actions navigate correctly
-2. **Projects** - Kanban drag-drop, subtask completion, tag management
-3. **Inventory** - Add/edit/delete items, sell workflow, trash/restore
-4. **Maintenance** - Add task, complete with details, skip cycle, view history
-5. **Vendors** - Add vendor, category management, preferred toggle
-6. **Documents** - File upload, OCR text appears in search, AI extraction button works
-7. **Diagrams** - Create new, add inventory items, save, export PNG
-8. **Home Info** - All tabs save correctly, paint colors, emergency contacts
-9. **Settings** - Theme toggle, data export/import works
-10. **Global Search** - Ctrl+K searches all data types
-
-### Build Commands
 ```bash
-# Frontend build (from /frontend)
-npm run build
+# Start development
+cd backend && npm run dev    # Backend on :3001
+cd frontend && npm run dev   # Frontend on :3000
 
-# Backend build (from /backend)
-npm run build
+# Build
+cd frontend && npm run build
+cd backend && npm run build
 
-# Docker build
-docker build -t hometracker .
+# Docker
+docker-compose up --build    # Full stack on :8080
+
+# Security audit
+.\scripts\security-audit.ps1
 ```
 
 ---
 
-## 📝 Recent Changes (Last 5 Versions)
+## 🔒 Security Tools
 
-### v1.7.0 (2024-12-11)
-- **Document Intelligence** - AI-powered data extraction from documents
-  - `documentExtraction.ts` - Extraction types and parsing utilities
-  - `DocumentExtractionModal.tsx` - Editable extraction results with one-click record creation
-  - Extract vendors, items, receipts, warranties, and maintenance from OCR text
-  - Smart matching suggestions for existing inventory/vendors
-  - Automatic record linking to source documents
-  - Feature toggle `enableDocumentIntelligence` in AI settings
-- **Enhanced Document Store** - Extended with AI extraction fields
-  - `aiExtracted` - Cached extraction results
-  - `linkedRecords` - Track records created from documents
-
-### v1.6.0 (2024-12-11)
-- **AI Core Infrastructure** - Foundation for all AI features
-  - `homeContext.ts` - Aggregates all stores into structured AI context
-  - Enhanced `aiService.ts` with generic `sendPrompt()`, response parsing
-  - `contextToPrompt()` and `contextToCompactJSON()` for AI prompts
-- **Natural Language Search** - Ask questions in GlobalSearch (Ctrl+K)
-  - Detects natural language queries automatically
-  - "Ask AI Assistant" button for intelligent answers
-  - Integrated into existing search modal
-- **AI Query Panel Component** - Reusable chat component
-  - Floating panel on Dashboard (when AI enabled)
-  - Context-aware quick actions per page
-  - Chat history within session
-- **AI Feature Toggles** - Granular control in Settings
-  - Natural Language Search
-  - Document Intelligence
-  - Maintenance Automation
-  - Smart Home Assistant
-  - Assistant Schedule (manual/daily/weekly)
-- **HomeContext Builder** - Full home state for AI
-  - Inventory with warranties, consumables, low stock
-  - Maintenance with overdue, upcoming, by priority
-  - Projects with active, stalled, budget tracking
-  - Vendors with preferred, by category
-  - Summary with needs attention, deadlines
-
-### v1.5.0 (2024-12-10)
-- **AI-Powered Diagram Assistant** - BYOK LLM integration for Mermaid diagrams
-  - Support for OpenAI, Anthropic (Claude), Google Gemini
-  - Chat interface for diagram help and troubleshooting
-  - Quick actions: Fix Errors, Explain, Improve, Create New
-  - Apply generated code directly to editor
-  - API keys stored locally in browser (privacy-first)
-- **Mermaid Diagram Support** - Create diagrams using Mermaid.js syntax
-  - Split-screen code editor with live preview
-  - Syntax error highlighting
-  - Link to Mermaid syntax documentation
-- **Diagram Zoom Controls** - Full zoom functionality
-  - Zoom in/out buttons with percentage display
-  - Fit-to-screen and reset zoom buttons
-  - Mouse wheel zoom in fullscreen mode (Ctrl+Scroll)
-  - Keyboard shortcuts (Ctrl+/-/0)
-- **Enhanced Export Options** - PNG and SVG export for all diagrams
-- **Keyboard Shortcuts Dialog** - Quick reference for all shortcuts
-- **AI Settings in Settings Page** - Centralized AI configuration
-  - Provider selection with model options
-  - Feature toggles for AI capabilities
-
-### v1.4.0 (2024-12-08)
-- **Inventory Part Storage Location Tracking** - Track where spare parts are stored
-- ConsumableInfo interface for filters, batteries, and other replacement items
-- Stock quantity tracking with low-stock alerts
-- Linked appliance support (e.g., filter linked to refrigerator)
-- Created CLAUDE.md AI continuity file
-
-### v1.3.2 (2024-12-08)
-- Fixed Excalidraw blank canvas issue
-- Added proper container sizing for diagram editor
-- Fixed dark mode styling for Excalidraw toolbar
-
-### v1.3.1 (2024-12-08)
-- Added Inventory Assets Panel to diagram editor
-- Can drag/drop inventory items onto diagrams
-- Items store inventory reference for dynamic linking
-
-### v1.3.0 (2024-12-08)
-- New Diagrams module with Excalidraw
-- 7 diagram categories (network, plumbing, electrical, floor-plan, hvac, yard, other)
-- Auto-save, thumbnails, PNG export
+| Tool | Purpose |
+|------|---------|
+| npm audit | Dependency vulnerabilities |
+| OSV Scanner | Google's vulnerability DB |
+| Secretlint | Secret detection |
+| ESLint Security | Code patterns |
+| CI/CD | Semgrep, Trivy, Gitleaks |
 
 ---
 
-## 🔗 Key Files Reference
+## 📝 Key Patterns
 
-| Purpose | File Path |
-|---------|-----------|
-| Main App Entry | `frontend/src/App.tsx` |
-| Route Definitions | `frontend/src/App.tsx` |
-| Navigation | `frontend/src/components/Layout.tsx` |
-| Global CSS | `frontend/src/index.css` |
-| Storage Utils | `frontend/src/lib/storage.ts` |
-| API Client | `frontend/src/lib/api.ts` |
-| AI Service | `frontend/src/lib/aiService.ts` |
-| HomeContext Builder | `frontend/src/lib/homeContext.ts` |
-| AI Settings Store | `frontend/src/store/aiSettingsStore.ts` |
-| Theme Provider | `frontend/src/components/ThemeProvider.tsx` |
-| Backend Entry | `backend/src/index.ts` |
-| Excel Export | `backend/src/services/excel.service.ts` |
-| Package.json (Frontend) | `frontend/package.json` |
-| Package.json (Backend) | `backend/package.json` |
+### Adding Quick Add to a Page
+```tsx
+// 1. Add state
+const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+
+// 2. Primary button in header
+<Button onClick={() => setIsQuickAddOpen(true)}>
+  <Plus /> Quick Add
+</Button>
+<Button variant="outline" onClick={() => setIsDetailedOpen(true)}>
+  <Settings /> Detailed
+</Button>
+
+// 3. Minimal dialog with defaults
+<Dialog open={isQuickAddOpen} onClose={() => setIsQuickAddOpen(false)}>
+  <form onSubmit={handleQuickSubmit}>
+    {/* Only essential fields */}
+  </form>
+</Dialog>
+```
+
+### Using Collapsible Form Sections
+```tsx
+import { FormSection } from '../components/ui/FormSection';
+
+<FormSection
+  title="Warranty"
+  description="Coverage details"
+  icon={<Shield className="w-4 h-4" />}
+  hasData={!!warranty?.endDate}
+  defaultExpanded={false}
+>
+  {/* Warranty fields */}
+</FormSection>
+```
+
+### Using Form Memory Hook
+```tsx
+import { useFormDefaults } from '../hooks/useFormMemory';
+
+const { getDefaults, saveValues } = useFormDefaults('items', defaultItem, ['category', 'location']);
+
+// On form open
+const defaults = getDefaults();
+
+// On form submit
+saveValues({ category, location });
+```
 
 ---
 
 ## 🚨 Known Issues
 
-1. **React Router Warnings** - Future flag deprecation warnings for v7 (cosmetic only)
-2. **Large Bundle Size** - Excalidraw adds ~1.5MB to bundle (expected)
-3. **Backend Offline** - Frontend works in offline mode with localStorage
+1. **React Router v7 warnings** - Deprecation warnings (cosmetic)
+2. **Large bundle** - TLDraw adds ~1.5MB (expected)
+3. **Auth not implemented** - Single-user mode only
 
 ---
 
-## 💡 Development Tips
+## 📚 Documentation Index
 
-1. **State Persistence**: All Zustand stores save to localStorage automatically via `storage.ts`
-2. **Adding New Stores**: Create in `/store`, export from store file, import where needed
-3. **Adding Routes**: Update `App.tsx` routes and `Layout.tsx` navigation
-4. **Adding to Global Search**: Update `GlobalSearch.tsx` PAGES array and search logic
-5. **Excalidraw**: Component needs explicit container dimensions (height/width)
-6. **Adding AI Features**: 
-   - Add feature toggle to `aiSettingsStore.ts` in `AIFeatureToggles`
-   - Add toggle UI in `Settings.tsx` AI Features section
-   - Use `isFeatureEnabled('featureName')` to check if enabled
-   - Use `buildHomeContext()` to get full home state for AI prompts
-   - Use `sendPrompt()` for generic AI calls with optional HomeContext
+| Document | Status | Purpose |
+|----------|--------|---------|
+| `README.md` | Current | Project overview, quick start |
+| `CLAUDE.md` | Current | AI assistant context (this file) |
+| `docs/V1_STATUS_REPORT.md` | Current | v1.0 audit |
+| `docs/V2_ROADMAP.md` | Current | v2.0 phases |
+| `docs/DEPLOYMENT.md` | Current | Docker deployment |
+| `docs/QUICKSTART.md` | Current | Setup guide |
+| `docs/BACKUP_STRATEGY.md` | Current | Backup best practices |
+
+### Archived (superseded by v2.0 work)
+- `docs/V1_ROADMAP.md` - Features now implemented
+- `docs/IMPROVEMENT_TRACKER.md` - Superseded by V2_ROADMAP
+- `docs/CLEANUP_PLAN.md` - Partially completed
+- `docs/ARCHITECTURE_REMEDIATION_PLAN.md` - Superseded by SQLite migration
+- `UI_UX_ANALYSIS.md` - Superseded by V2_ROADMAP Phase 2.1
 
 ---
 
@@ -591,9 +432,7 @@ docker build -t hometracker .
 
 ---
 
----
-
-## 🧹 Local Development
+## 💡 Development Tips
 
 ### Quick Start
 ```bash

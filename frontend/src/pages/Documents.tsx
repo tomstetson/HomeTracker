@@ -10,13 +10,14 @@ import {
   FileText, Upload, Search, Edit, Trash2, Download,
   HardDrive, FileImage, FileSpreadsheet, File,
   Loader2, Scan, CheckCircle, AlertTriangle, Clock,
-  ExternalLink, Sparkles, Brain
+  Sparkles, Brain
 } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 import { DocumentExtractionModal, LinkedRecord } from '../components/DocumentExtractionModal';
 import { ExtractedData, hasExtractedContent } from '../lib/documentExtraction';
 import { useAISettingsStore } from '../store/aiSettingsStore';
 import { isAIReady, classifyDocument } from '../lib/aiService';
+import { DocumentViewer } from '../components/DocumentViewer';
 
 // Image Preview component with proper loading state
 const ImagePreview = memo(({ 
@@ -81,6 +82,7 @@ export default function Documents() {
   const [isExtractionModalOpen, setIsExtractionModalOpen] = useState(false);
   const [extractionDocument, setExtractionDocument] = useState<Document | null>(null);
   const [extractionOcrText, setExtractionOcrText] = useState<string>('');
+  const [viewerDocIndex, setViewerDocIndex] = useState(-1);
 
   // AI Settings
   const { isFeatureEnabled } = useAISettingsStore();
@@ -418,10 +420,29 @@ export default function Documents() {
     }
   };
 
-  // View document details
+  // View document details - using new DocumentViewer
   const handleView = (doc: Document) => {
+    const index = filteredDocuments.findIndex(d => d.id === doc.id);
+    setViewerDocIndex(index);
     setSelectedDocument(doc);
     setIsViewDialogOpen(true);
+  };
+
+  // Navigate to next/previous document in viewer
+  const handleViewerNext = () => {
+    if (viewerDocIndex < filteredDocuments.length - 1) {
+      const nextDoc = filteredDocuments[viewerDocIndex + 1];
+      setViewerDocIndex(viewerDocIndex + 1);
+      setSelectedDocument(nextDoc);
+    }
+  };
+
+  const handleViewerPrevious = () => {
+    if (viewerDocIndex > 0) {
+      const prevDoc = filteredDocuments[viewerDocIndex - 1];
+      setViewerDocIndex(viewerDocIndex - 1);
+      setSelectedDocument(prevDoc);
+    }
   };
 
   // Handle AI extraction
@@ -852,127 +873,21 @@ export default function Documents() {
         </form>
       </Dialog>
 
-      {/* View Dialog */}
-      <Dialog 
-        open={isViewDialogOpen} 
-        onClose={() => setIsViewDialogOpen(false)}
-        title={selectedDocument?.name || 'Document Details'}
-      >
-        {selectedDocument && (() => {
-          const storedFile = storedFiles.find(f => f.id === selectedDocument.id);
-          
-          return (
-            <div className="space-y-4">
-              {/* Preview */}
-              <div className="aspect-video bg-muted/30 rounded-lg overflow-hidden flex items-center justify-center">
-                {storedFile && fileApi.isImage(storedFile.mimeType) ? (
-                  <img 
-                    src={fileApi.getViewUrl(storedFile.id)} 
-                    alt={selectedDocument.name}
-                    className="max-w-full max-h-full object-contain select-none"
-                    draggable={false}
-                  />
-                ) : (
-                  <div className="text-center">
-                    {getFileIcon(selectedDocument.fileType)}
-                    <p className="text-muted-foreground mt-2 uppercase">{selectedDocument.fileType}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Category</p>
-                  <p className="font-medium text-foreground capitalize">{selectedDocument.category}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Size</p>
-                  <p className="font-medium text-foreground">
-                    {fileApi.formatFileSize(selectedDocument.fileSize || 0)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Uploaded</p>
-                  <p className="font-medium text-foreground">{formatDate(selectedDocument.uploadDate)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Type</p>
-                  <p className="font-medium text-foreground uppercase">{selectedDocument.fileType}</p>
-                </div>
-              </div>
-
-              {selectedDocument.description && (
-                <div>
-                  <p className="text-muted-foreground text-sm">Description</p>
-                  <p className="text-foreground">{selectedDocument.description}</p>
-                </div>
-              )}
-
-              {/* OCR Text */}
-              {storedFile?.ocrText && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Scan className="w-4 h-4 text-primary" />
-                    <p className="text-sm font-medium text-foreground">Extracted Text (OCR)</p>
-                    {getOcrStatusBadge(storedFile)}
-                  </div>
-                  <div className="p-3 bg-muted/20 rounded-lg text-sm text-muted-foreground max-h-40 overflow-y-auto whitespace-pre-wrap">
-                    {storedFile.ocrText}
-                  </div>
-                </div>
-              )}
-
-              {/* Tags */}
-              {selectedDocument.tags && selectedDocument.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {selectedDocument.tags.map((tag, i) => (
-                    <span key={i} className="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <DialogFooter>
-                {/* AI Extract button in view dialog - only show if not already extracted */}
-                {documentIntelligenceEnabled && storedFile?.ocrText && !selectedDocument.aiExtracted && (
-                  <Button 
-                    variant="outline"
-                    className="text-purple-600 hover:text-purple-700 dark:text-purple-400"
-                    onClick={() => {
-                      setIsViewDialogOpen(false);
-                      handleExtract(selectedDocument, storedFile.ocrText!);
-                    }}
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Extract Data
-                  </Button>
-                )}
-                {storedFile && (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => window.open(fileApi.getViewUrl(storedFile.id), '_blank')}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Open
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => window.open(fileApi.getDownloadUrl(storedFile.id), '_blank')}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                  </>
-                )}
-                <Button onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-              </DialogFooter>
-            </div>
-          );
-        })()}
-      </Dialog>
+      {/* Document Viewer - Full-featured PDF/Image viewer */}
+      <DocumentViewer
+        document={selectedDocument}
+        storedFile={selectedDocument ? storedFiles.find(f => f.id === selectedDocument.id) || null : null}
+        open={isViewDialogOpen}
+        onClose={() => {
+          setIsViewDialogOpen(false);
+          setSelectedDocument(null);
+          setViewerDocIndex(-1);
+        }}
+        onNext={handleViewerNext}
+        onPrevious={handleViewerPrevious}
+        hasNext={viewerDocIndex < filteredDocuments.length - 1}
+        hasPrevious={viewerDocIndex > 0}
+      />
 
       {/* AI Extraction Modal */}
       {extractionDocument && (

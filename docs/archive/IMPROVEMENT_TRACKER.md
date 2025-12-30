@@ -115,6 +115,13 @@ This document tracks identified issues, potential improvements, and technical de
 | 2024-12-21 | - | Made property module dynamic and clickable |
 | 2024-12-21 | - | Added comprehensive store tests |
 | 2024-12-21 | - | Fixed git CRLF line ending warnings |
+| 2024-12-30 | U2 | Added loading states (ImageWithFallback, AIProgress) |
+| 2024-12-30 | U3 | Added OfflineIndicator component |
+| 2024-12-30 | - | SQLite backend with WAL mode (replaces localStorage concerns) |
+| 2024-12-30 | - | PWA with service worker caching |
+| 2024-12-30 | - | Mobile bottom nav + gestures |
+| 2024-12-30 | - | AI suggestions service (category, maintenance, predictive) |
+| 2024-12-30 | - | Notification scheduler service |
 
 ---
 

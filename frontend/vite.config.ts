@@ -105,6 +105,7 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
+    host: true, // Listen on all interfaces (0.0.0.0) for LAN access
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

@@ -89,7 +89,7 @@ async function convertHeicToJpeg(inputBuffer: Buffer): Promise<Buffer> {
   console.log('🔄 Converting HEIC to JPEG...');
   try {
     const outputBuffer = await heicConvert({
-      buffer: inputBuffer,
+      buffer: new Uint8Array(inputBuffer).buffer,
       format: 'JPEG',
       quality: 0.9,
     });

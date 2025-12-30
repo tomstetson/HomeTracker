@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -24,15 +25,21 @@ import authRoutes from './routes/auth.routes';
 import imagesRoutes from './routes/images.routes';
 import aiJobsRoutes from './routes/ai-jobs.routes';
 import storageRoutes from './routes/storage.routes';
+import notificationsRoutes from './routes/notifications.routes';
+import suggestionsRoutes from './routes/suggestions.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 
 // Import Excel service for graceful shutdown
 import { excelService } from './services/excel.service';
 import { maintenanceChecker } from './services/maintenance-checker.service';
 import { databaseService } from './services/database.service';
 import { backupSchedulerService } from './services/backup-scheduler.service';
+import { ensureDefaultAdmin } from './services/auth.service';
+import { notificationSchedulerService } from './services/notification-scheduler.service';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for LAN access
 
 // Middleware
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -45,6 +52,7 @@ app.use(compression());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cookieParser());
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {
@@ -70,6 +78,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/images', imagesRoutes);
 app.use('/api/ai-jobs', aiJobsRoutes);
 app.use('/api/storage', storageRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/suggestions', suggestionsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Settings routes
 app.get('/api/settings', (req: Request, res: Response) => {
@@ -113,16 +124,22 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Start server
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Home Tracker API running on http://localhost:${PORT}`);
+const server = app.listen(Number(PORT), HOST, async () => {
+  console.log(`🚀 Home Tracker API running on http://${HOST}:${PORT}`);
+  console.log(`🌐 LAN Access: http://<your-ip>:${PORT}`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
   console.log(`📊 Excel download: http://localhost:${PORT}/api/excel/download`);
   console.log(`🖼️  Image upload: http://localhost:${PORT}/api/images/upload`);
   console.log(`🤖 AI Jobs: http://localhost:${PORT}/api/ai-jobs`);
+  console.log(`🔐 Auth: http://localhost:${PORT}/api/auth`);
+  
+  // Ensure default admin user exists
+  await ensureDefaultAdmin();
   
   // Initialize background jobs
   maintenanceChecker.init();
   backupSchedulerService.initialize();
+  notificationSchedulerService.initialize();
 });
 
 // Handle server errors

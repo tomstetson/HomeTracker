@@ -8,6 +8,7 @@ import { Input, Select, Textarea } from '../components/ui/Input';
 import { TagInput, PROJECT_TAG_SUGGESTIONS } from '../components/ui/TagInput';
 import { useToast } from '../components/ui/Toast';
 import { useConfirm } from '../components/ui/ConfirmDialog';
+import { useFormMemory } from '../hooks/useFormMemory';
 import { 
   Plus, GripVertical, Calendar, DollarSign, Tag, Edit, Trash2, 
   ChevronDown, ChevronRight, LayoutGrid, List, Filter,
@@ -26,8 +27,15 @@ export default function Projects() {
   const { vendors } = useVendorStore();
   const toast = useToast();
   const confirm = useConfirm();
+  
+  // Form memory - remember last used category
+  const { lastUsed, rememberAll } = useFormMemory('projects', { 
+    fields: ['category'] 
+  });
+  
   const [draggedProject, setDraggedProject] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isSubtaskDialogOpen, setIsSubtaskDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -557,9 +565,13 @@ export default function Projects() {
               <List className="w-4 h-4" />
             </button>
           </div>
-          <Button onClick={openAddDialog} className="flex items-center gap-2">
+          <Button onClick={() => setIsQuickAddOpen(true)} className="flex items-center gap-2">
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">New Project</span>
+            <span className="hidden sm:inline">Quick Add</span>
+          </Button>
+          <Button variant="outline" onClick={openAddDialog} className="hidden sm:flex items-center gap-2">
+            <Edit className="w-4 h-4" />
+            <span>Detailed</span>
           </Button>
         </div>
       </div>
@@ -685,6 +697,60 @@ export default function Projects() {
           ))}
         </div>
       )}
+
+      {/* Quick Add Project Dialog */}
+      <Dialog
+        open={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        title="Quick Add Project"
+        maxWidth="sm"
+      >
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          const category = formData.get('category') as string || 'General';
+          
+          // Remember category for next time
+          rememberAll({ category });
+          
+          const newProject: Project = {
+            id: `proj-${Date.now()}`,
+            name: formData.get('name') as string,
+            description: '',
+            category,
+            status: (formData.get('status') as Project['status']) || 'backlog',
+            priority: 'medium',
+            budget: 0,
+            actualCost: 0,
+            progress: 0,
+            tags: [],
+            subtasks: [],
+          };
+          addProject(newProject);
+          setIsQuickAddOpen(false);
+          toast.success('Project Added', `"${newProject.name}" created`);
+        }}>
+          <div className="space-y-4">
+            <Input name="name" label="Project Name" required placeholder="e.g., Kitchen Remodel" autoFocus />
+            <div className="grid grid-cols-2 gap-4">
+              <Input name="category" label="Category" defaultValue={lastUsed.category} placeholder="e.g., Renovation" />
+              <Select
+                name="status"
+                label="Status"
+                defaultValue="backlog"
+                options={columns.map(c => ({ value: c.id, label: c.title }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsQuickAddOpen(false)}>Cancel</Button>
+            <Button type="submit">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Project
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
 
       {/* Add Project Dialog */}
       <Dialog

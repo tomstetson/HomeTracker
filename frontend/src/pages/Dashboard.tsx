@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Package, Wrench, Shield, FolderKanban, TrendingUp, AlertCircle } from 'lucide-react';
+import { AIJobWidget } from '../components/AIJobMonitor';
 import { useProjectStore } from '../store/projectStore';
 import { useInventoryStore } from '../store/inventoryStore';
 import { useMaintenanceStore } from '../store/maintenanceStore';
@@ -215,8 +216,15 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card>
+      {/* AI Processing & Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* AI Job Monitor Widget */}
+        <div className="lg:col-span-1">
+          <AIJobWidget />
+        </div>
+
+        {/* Quick Actions */}
+        <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle className="text-xl">Quick Actions</CardTitle>
         </CardHeader>
@@ -237,7 +245,8 @@ export default function Dashboard() {
             ))}
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
 
       {/* Floating AI Assistant Panel */}
       {showAIAssistant && (

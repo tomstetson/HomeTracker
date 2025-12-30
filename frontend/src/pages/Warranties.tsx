@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWarrantyStore, Warranty } from '../store/warrantyStore';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -6,6 +6,7 @@ import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useConfirm } from '../components/ui/ConfirmDialog';
+import { api } from '../lib/api';
 import {
   Plus,
   Search,
@@ -19,6 +20,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Camera,
+  Loader2,
+  Sparkles,
+  Upload,
 } from 'lucide-react';
 import { cn, formatDate } from '../lib/utils';
 
@@ -43,6 +48,13 @@ export default function Warranties() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedWarranty, setSelectedWarranty] = useState<Warranty | null>(null);
+  
+  // AI Scan state
+  const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanPreview, setScanPreview] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadFromStorage();
@@ -187,6 +199,66 @@ export default function Warranties() {
     setIsEditDialogOpen(true);
   };
 
+  // AI Scan functionality
+  const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => setScanPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+
+    setIsScanning(true);
+    setScanResult(null);
+
+    try {
+      // Upload image and get ID
+      const uploadResult = await api.uploadImage(file, 'warranty', 'pending', false);
+      
+      if (!uploadResult.success || !uploadResult.image) {
+        throw new Error(uploadResult.error || 'Upload failed');
+      }
+
+      // Analyze with warranty_detection
+      const analysisResult = await api.analyzeSingleImage(
+        uploadResult.image.id,
+        'warranty_detection'
+      );
+
+      if (analysisResult.success && analysisResult.analysis) {
+        setScanResult(analysisResult.analysis);
+        toast.success('Scan Complete', 'Warranty information extracted');
+      } else {
+        throw new Error(analysisResult.error || 'Analysis failed');
+      }
+    } catch (error: any) {
+      toast.error('Scan Failed', error.message);
+      setScanResult(null);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const applyScannedData = () => {
+    if (!scanResult) return;
+
+    // Pre-fill the add dialog with scanned data
+    setIsScanDialogOpen(false);
+    setIsAddDialogOpen(true);
+
+    // The form will be pre-filled via the scanResult state
+    toast.info('Data Applied', 'Review and complete the warranty details');
+  };
+
+  const resetScan = () => {
+    setScanPreview(null);
+    setScanResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -208,10 +280,16 @@ export default function Warranties() {
           <h1 className="text-3xl font-bold text-foreground mb-2">Warranties</h1>
           <p className="text-muted-foreground">Track warranties and never miss a claim</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="flex items-center space-x-2">
-          <Plus className="w-4 h-4" />
-          <span>Add Warranty</span>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsScanDialogOpen(true)} className="flex items-center space-x-2">
+            <Camera className="w-4 h-4" />
+            <span>Scan Document</span>
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)} className="flex items-center space-x-2">
+            <Plus className="w-4 h-4" />
+            <span>Add Warranty</span>
+          </Button>
+        </div>
       </div>
 
       {/* Search & Filters */}
@@ -487,6 +565,137 @@ export default function Warranties() {
             </DialogFooter>
           </form>
         )}
+      </Dialog>
+
+      {/* AI Scan Dialog */}
+      <Dialog
+        open={isScanDialogOpen}
+        onClose={() => {
+          setIsScanDialogOpen(false);
+          resetScan();
+        }}
+        title="Scan Warranty Document"
+        description="Upload a photo of your warranty card, receipt, or documentation"
+        maxWidth="lg"
+      >
+        <div className="space-y-4">
+          {/* File Upload Area */}
+          <div
+            className={cn(
+              "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
+              scanPreview ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover:border-primary/50"
+            )}
+          >
+            {scanPreview ? (
+              <div className="space-y-4">
+                <img
+                  src={scanPreview}
+                  alt="Warranty document preview"
+                  className="max-h-64 mx-auto rounded-lg shadow-md"
+                />
+                {isScanning && (
+                  <div className="flex items-center justify-center gap-2 text-primary">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Analyzing document...</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Upload warranty document</p>
+                  <p className="text-sm text-muted-foreground">
+                    Supports JPG, PNG, HEIC
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Select File
+                </Button>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleScanFile}
+            />
+          </div>
+
+          {/* Scan Results */}
+          {scanResult && (
+            <Card className="bg-emerald-500/10 border-emerald-500/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-5 h-5 text-emerald-500" />
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    Warranty Information Detected
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {scanResult.itemName && (
+                    <div>
+                      <span className="text-muted-foreground">Item:</span>
+                      <span className="ml-2 font-medium">{scanResult.itemName}</span>
+                    </div>
+                  )}
+                  {scanResult.provider && (
+                    <div>
+                      <span className="text-muted-foreground">Provider:</span>
+                      <span className="ml-2 font-medium">{scanResult.provider}</span>
+                    </div>
+                  )}
+                  {scanResult.startDate && (
+                    <div>
+                      <span className="text-muted-foreground">Start:</span>
+                      <span className="ml-2 font-medium">{scanResult.startDate}</span>
+                    </div>
+                  )}
+                  {scanResult.endDate && (
+                    <div>
+                      <span className="text-muted-foreground">End:</span>
+                      <span className="ml-2 font-medium">{scanResult.endDate}</span>
+                    </div>
+                  )}
+                  {scanResult.policyNumber && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Policy #:</span>
+                      <span className="ml-2 font-medium">{scanResult.policyNumber}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setIsScanDialogOpen(false);
+              resetScan();
+            }}
+          >
+            Cancel
+          </Button>
+          {scanPreview && !isScanning && (
+            <Button variant="outline" onClick={resetScan}>
+              Scan Another
+            </Button>
+          )}
+          {scanResult && (
+            <Button onClick={applyScannedData}>
+              <Sparkles className="w-4 h-4 mr-2" />
+              Use This Data
+            </Button>
+          )}
+        </DialogFooter>
       </Dialog>
     </div>
   );

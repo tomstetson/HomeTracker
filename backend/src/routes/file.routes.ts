@@ -260,6 +260,56 @@ router.get('/:id/view', (req: Request, res: Response) => {
   }
 });
 
+// Serve thumbnail for images
+router.get('/:id/thumbnail', (req: Request, res: Response) => {
+  try {
+    const file = fileService.getFile(req.params.id);
+    
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found',
+      });
+    }
+
+    // Check if it's an image
+    if (!file.mimeType.startsWith('image/')) {
+      return res.status(400).json({
+        success: false,
+        error: 'File is not an image',
+      });
+    }
+
+    // Check for thumbnail first
+    if (file.thumbnailPath) {
+      const thumbnailFullPath = path.join(__dirname, '../../data', file.thumbnailPath);
+      if (fs.existsSync(thumbnailFullPath)) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        return fs.createReadStream(thumbnailFullPath).pipe(res);
+      }
+    }
+
+    // Fallback to full image
+    const filePath = fileService.getFilePath(file.filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found on disk',
+      });
+    }
+
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    fs.createReadStream(filePath).pipe(res);
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to serve thumbnail',
+    });
+  }
+});
+
 // Re-run OCR for a file
 router.post('/:id/ocr', async (req: Request, res: Response) => {
   try {

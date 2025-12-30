@@ -18,7 +18,18 @@ interface SheetData {
   columns: string[];
 }
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+// Dynamically determine API URL based on current browser location
+const API_URL = (() => {
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl) return envUrl;
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      return `http://${hostname}:3001`;
+    }
+  }
+  return 'http://localhost:3001';
+})();
 
 export default function ExcelViewer() {
   const toast = useToast();

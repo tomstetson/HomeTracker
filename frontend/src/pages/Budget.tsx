@@ -5,6 +5,7 @@ import { Dialog, DialogFooter } from '../components/ui/Dialog';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
 import { useConfirm } from '../components/ui/ConfirmDialog';
+import { useFormMemory } from '../hooks/useFormMemory';
 import {
   useBudgetStore,
   Transaction,
@@ -40,6 +41,11 @@ export default function Budget() {
   const toast = useToast();
   const confirm = useConfirm();
   const { vendors } = useVendorStore();
+  
+  // Form memory - remember last used category and type
+  const { lastUsed, rememberAll } = useFormMemory('budget', { 
+    fields: ['category', 'type'] 
+  });
   const {
     transactions,
     budgets,
@@ -64,6 +70,7 @@ export default function Budget() {
 
   // Modal state
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editingBudget, setEditingBudget] = useState<BudgetType | null>(null);
@@ -644,7 +651,7 @@ export default function Budget() {
           <p className="text-muted-foreground">Track income, expenses, and budgets</p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Select
             value={timeFilter}
             onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
@@ -655,9 +662,13 @@ export default function Budget() {
               { value: 'all', label: 'All Time' },
             ]}
           />
-          <Button onClick={handleAddTransaction}>
+          <Button onClick={() => setIsQuickAddOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Add Transaction
+            Quick Add
+          </Button>
+          <Button variant="outline" onClick={handleAddTransaction} className="hidden sm:flex">
+            <DollarSign className="w-4 h-4 mr-2" />
+            Detailed
           </Button>
         </div>
       </div>
@@ -710,11 +721,100 @@ export default function Budget() {
       {viewMode === 'budgets' && renderBudgetsList()}
       {viewMode === 'analytics' && renderAnalytics()}
 
-      {/* Transaction Modal */}
+      {/* Quick Add Transaction Dialog */}
+      <Dialog
+        open={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+        title="Quick Add Transaction"
+        maxWidth="sm"
+      >
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          const amount = parseFloat(formData.get('amount') as string) || 0;
+          
+          if (amount <= 0) {
+            toast.error('Invalid amount', 'Please enter a valid amount');
+            return;
+          }
+          
+          const type = (formData.get('type') as TransactionType) || 'expense';
+          const category = (formData.get('category') as TransactionCategory) || 'other';
+          
+          // Remember category and type for next time
+          rememberAll({ category, type });
+          
+          addTransaction({
+            id: `trans-${Date.now()}`,
+            type,
+            category,
+            amount,
+            description: formData.get('description') as string || 'Quick transaction',
+            date: formData.get('date') as string || new Date().toISOString().split('T')[0],
+            tags: [],
+            isRecurring: false,
+          });
+          setIsQuickAddOpen(false);
+          toast.success('Added', `${type === 'income' ? 'Income' : 'Expense'} of ${formatCurrency(amount)} recorded`);
+        }}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                name="type"
+                label="Type"
+                defaultValue={lastUsed.type || 'expense'}
+                options={[
+                  { value: 'expense', label: 'Expense' },
+                  { value: 'income', label: 'Income' },
+                ]}
+              />
+              <Input
+                name="amount"
+                label="Amount"
+                type="number"
+                step="0.01"
+                required
+                placeholder="0.00"
+                autoFocus
+              />
+            </div>
+            <Input
+              name="description"
+              label="What was it for?"
+              placeholder="e.g., Plumber visit"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                name="category"
+                label="Category"
+                defaultValue={lastUsed.category}
+                options={TRANSACTION_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))}
+              />
+              <Input
+                name="date"
+                label="Date"
+                type="date"
+                defaultValue={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsQuickAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              <Plus className="w-4 h-4 mr-2" />
+              Add
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+
+      {/* Transaction Modal (Detailed) */}
       <Dialog
         open={isTransactionModalOpen}
         onClose={() => setIsTransactionModalOpen(false)}
-        title={editingTransaction ? 'Edit Transaction' : 'Add Transaction'}
+        title={editingTransaction ? 'Edit Transaction' : 'Add Transaction (Detailed)'}
         maxWidth="md"
       >
         <div className="space-y-4">

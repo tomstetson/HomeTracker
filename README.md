@@ -2,21 +2,29 @@
   <img src="docs/logo.svg" alt="HomeTracker Logo" width="120" height="120">
 </p>
 
-<h1 align="center">HomeTracker</h1>
+<h1 align="center">HomeTracker v2.0</h1>
 
 <p align="center">
   <strong>The complete home management solution for homelabbers.</strong>
 </p>
 
 <p align="center">
-  Track everything about your home in one place: projects, inventory, warranties, maintenance, vendors, and more.<br>
-  Self-hosted, privacy-focused, and designed for homelab deployment.
+  Track everything about your home in one place: projects, inventory, warranties, maintenance, vendors, documents, and more.<br>
+  Self-hosted, privacy-focused, AI-powered, and designed for homelab deployment.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-2.0-blue" alt="Version 2.0">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
+  <img src="https://img.shields.io/badge/docker-ready-blue" alt="Docker Ready">
+  <img src="https://img.shields.io/badge/PWA-enabled-purple" alt="PWA Enabled">
 </p>
 
 <p align="center">
   <a href="#-features">Features</a> •
   <a href="#-screenshots">Screenshots</a> •
   <a href="#-quick-start">Quick Start</a> •
+  <a href="#-ai-features">AI Features</a> •
   <a href="#-deployment">Deployment</a> •
   <a href="#-documentation">Documentation</a>
 </p>
@@ -29,8 +37,10 @@ Managing a home involves tracking **a lot** of information: warranty expiration 
 
 **Built for homelabbers**, HomeTracker is:
 - **Self-hosted** - Your data stays on your server
-- **Privacy-focused** - No cloud accounts, no data sharing
-- **Resource-efficient** - Runs great on a Raspberry Pi
+- **Privacy-focused** - No cloud accounts required, no data sharing
+- **AI-powered** - BYOK (Bring Your Own Key) for OpenAI, Anthropic, or Google
+- **Mobile-ready** - PWA with offline support and native-like experience
+- **Resource-efficient** - Runs great on a Raspberry Pi or NAS
 - **Docker-ready** - Single container deployment
 
 ---
@@ -76,28 +86,55 @@ Managing a home involves tracking **a lot** of information: warranty expiration 
 
 ## ✨ Features
 
-### 📋 Core Modules
+### 📋 Core Modules (12 Pages)
 
 | Module | Description |
 |--------|-------------|
-| **Dashboard** | At-a-glance overview with quick actions |
+| **Dashboard** | At-a-glance overview with analytics and quick actions |
 | **Projects** | Kanban board with subtasks, budgets, progress tracking, and tags |
-| **Inventory** | Track items with warranties, sell tracking, and soft delete |
-| **Maintenance** | Schedule tasks with priorities, recurrence, and service history |
-| **Vendors** | Directory of contractors with custom categories |
-| **Documents** | Store files with OCR search capability |
+| **Inventory** | Track items with warranties, values, sell tracking, and AI categorization |
+| **Warranties** | Dedicated warranty tracking with expiration alerts |
+| **Maintenance** | Schedule tasks with priorities, recurrence, and predictive suggestions |
+| **Vendors** | Directory of contractors with ratings and custom categories |
+| **Documents** | Store files with OCR search and AI classification |
+| **Diagrams** | Create floor plans with TLDraw and Mermaid |
 | **Home Info** | Property details, value tracking, paint colors, emergency contacts |
-| **Settings** | App configuration, data management, backup options |
+| **Budget** | Track income, expenses, and budget goals by category |
+| **Backup** | Automated backups to local storage or WebDAV (NAS) |
+| **Settings** | App configuration, AI settings, data management |
 
 ### 🚀 Key Capabilities
 
+- **🤖 AI-Powered** - Smart categorization, maintenance suggestions, predictive alerts (BYOK)
+- **📱 PWA Mobile App** - Install on phone, works offline, native-like experience
 - **🌙 Dark/Light Mode** - Beautiful UI with full theme support
-- **📱 Responsive** - Works on desktop, tablet, and mobile
 - **🔍 Global Search** - Find anything with `Ctrl+K`
 - **📊 Excel Export** - All data synced to `.xlsx` in real-time
-- **📄 File Storage** - Upload receipts, manuals, photos
-- **🔍 OCR Search** - Extract text from images automatically
+- **📄 File Storage** - Upload receipts, manuals, photos with thumbnails
+- **🔔 Smart Notifications** - Warranty expirations, maintenance due, project deadlines
+- **💾 Auto-Backup** - Scheduled backups to local or NAS (WebDAV)
 - **🐳 Docker Ready** - Single container deployment
+
+---
+
+## 🤖 AI Features
+
+HomeTracker uses a **BYOK (Bring Your Own Key)** model - you provide your own API key from OpenAI, Anthropic, or Google. Your data stays private.
+
+| Feature | Description |
+|---------|-------------|
+| **Smart Categorization** | Auto-suggest categories when adding items |
+| **Maintenance Suggestions** | AI recommends maintenance tasks based on item type |
+| **Predictive Alerts** | Identifies neglected items and frequent repairs |
+| **Document Intelligence** | Extract text and classify uploaded documents |
+| **Diagram Assistant** | Generate Mermaid diagrams from natural language |
+
+**Supported Providers:**
+- OpenAI (GPT-4, GPT-3.5)
+- Anthropic (Claude)
+- Google (Gemini)
+
+> **Note:** AI features are optional. HomeTracker works fully without AI configuration.
 
 ---
 
@@ -156,10 +193,10 @@ services:
 
 | File | Description |
 |------|-------------|
-| `hometracker.json` | Primary data file (auto-saved) |
+| `hometracker.db` | SQLite database (WAL mode) |
 | `hometracker.xlsx` | Excel export (auto-generated) |
 | `uploads/` | Uploaded documents and images |
-| `backups/` | Automated backups |
+| `backups/` | Automated backups (local + WebDAV) |
 
 ### Backup
 
@@ -191,9 +228,32 @@ services:
 | Layer | Technology |
 |-------|------------|
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS, Zustand |
-| Backend | Node.js, Express.js, ExcelJS, Tesseract.js (OCR) |
-| Storage | JSON files + Excel export |
+| Backend | Node.js, Express.js, SQLite (better-sqlite3), Sharp |
+| AI | BYOK (OpenAI, Anthropic, Google) - user provides API keys |
+| Storage | SQLite DB (WAL mode) + Local files + WebDAV (NAS) |
+| Mobile | PWA with service worker, offline caching |
 | Deployment | Docker, Nginx, Supervisor |
+
+---
+
+## 📱 Mobile Experience
+
+HomeTracker is a **Progressive Web App (PWA)** that can be installed on your phone:
+
+- **Install to Home Screen** - Works like a native app
+- **Offline Support** - View data without internet connection
+- **Bottom Navigation** - Mobile-optimized nav with quick actions
+- **Touch Gestures** - Swipe actions on list items
+- **Pull to Refresh** - Native-feeling interactions
+
+---
+
+## 🔒 Security
+
+- **No cloud dependency** - All data stays on your server
+- **Optional auth** - Enable Supabase authentication for multi-user
+- **Secret scanning** - Secretlint integration for dev security
+- **Security audits** - npm audit, OSV Scanner, Semgrep in CI/CD
 
 ---
 
@@ -216,5 +276,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <p align="center">
+  <strong>HomeTracker v2.0</strong><br>
   Made with ❤️ for homeowners and homelabbers
 </p>
