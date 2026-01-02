@@ -36,6 +36,8 @@ import { databaseService } from './services/database.service';
 import { backupSchedulerService } from './services/backup-scheduler.service';
 import { ensureDefaultAdmin } from './services/auth.service';
 import { notificationSchedulerService } from './services/notification-scheduler.service';
+import { powerAggregationService } from './services/power-aggregation.service';
+import { powerRetentionService } from './services/power-retention.service';
 
 // Import rate limiting middleware
 import { apiLimiter, authLimiter, aiLimiter, uploadLimiter } from './middleware/rateLimit.middleware';
@@ -196,6 +198,10 @@ const server = app.listen(Number(PORT), HOST, async () => {
   maintenanceChecker.init();
   backupSchedulerService.initialize();
   notificationSchedulerService.initialize();
+
+  // Initialize power monitoring services (only active if POWER_MONITORING_ENABLED=true)
+  powerAggregationService.initialize();
+  powerRetentionService.initialize();
 });
 
 // Handle server errors
