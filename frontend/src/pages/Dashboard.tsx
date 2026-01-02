@@ -7,7 +7,7 @@ import { useInventoryStore } from '../store/inventoryStore';
 import { useMaintenanceStore } from '../store/maintenanceStore';
 import { useWarrantyStore } from '../store/warrantyStore';
 import { cn, formatCurrency } from '../lib/utils';
-import { AIQueryPanel } from '../components/AIQueryPanel';
+import { MapleChat } from '../components/MapleChat';
 import { useAISettingsStore } from '../store/aiSettingsStore';
 
 export default function Dashboard() {
@@ -248,10 +248,9 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Floating AI Assistant Panel */}
+      {/* Floating Maple AI Assistant */}
       {showAIAssistant && (
-        <AIQueryPanel
-          title="Home Assistant"
+        <MapleChat
           context="general"
           floating={true}
           defaultCollapsed={true}
