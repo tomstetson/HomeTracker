@@ -1,6 +1,9 @@
 /**
- * AIQueryPanel - A reusable AI chat component for HomeTracker
- * 
+ * MapleChat - Maple 🍁 AI Assistant for HomeTracker
+ *
+ * Maple is your friendly home management AI assistant that helps you manage
+ * your inventory, maintenance, projects, and more through natural conversation.
+ *
  * Features:
  * - Chat-style interface with message history
  * - Quick action buttons for common queries
@@ -10,13 +13,12 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Sparkles, 
-  Send, 
-  ChevronDown, 
-  ChevronUp, 
-  AlertCircle, 
-  Settings, 
+import {
+  Send,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Settings,
   RefreshCw,
   Lightbulb,
   Wrench,
@@ -42,7 +44,7 @@ export interface QuickAction {
   prompt: string;
 }
 
-export interface AIQueryPanelProps {
+export interface MapleChatProps {
   /** Title shown in the panel header */
   title?: string;
   /** Initial system context hint (e.g., "inventory", "maintenance") */
@@ -114,8 +116,8 @@ const QUICK_ACTIONS: Record<string, QuickAction[]> = {
 // Component
 // ============================================================================
 
-export function AIQueryPanel({
-  title = 'AI Assistant',
+export function MapleChat({
+  title = 'Maple',
   context = 'general',
   quickActions,
   floating = true,
@@ -123,7 +125,7 @@ export function AIQueryPanel({
   onToggle,
   className,
   minHeight = '400px',
-}: AIQueryPanelProps) {
+}: MapleChatProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -310,11 +312,11 @@ export function AIQueryPanel({
     <div className={panelClasses} style={{ maxHeight: isOpen ? minHeight : 'auto' }}>
       {/* Header */}
       <div
-        className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white cursor-pointer"
+        className="flex items-center justify-between p-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white cursor-pointer"
         onClick={handleToggle}
       >
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4" />
+          <span className="text-lg">🍁</span>
           <span className="font-semibold text-sm">{title}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -331,8 +333,8 @@ export function AIQueryPanel({
           {!aiReady.ready ? (
             // Not configured state
             <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-muted-foreground">
-              <AlertCircle className="w-10 h-10 mb-3 text-amber-500" />
-              <p className="font-medium mb-2">AI Assistant Not Configured</p>
+              <div className="text-4xl mb-3">🍁</div>
+              <p className="font-medium mb-2">Maple Not Configured</p>
               <p className="text-sm mb-4">{aiReady.error}</p>
               <Link to="/settings">
                 <Button size="sm" className="flex items-center gap-2">
@@ -348,8 +350,8 @@ export function AIQueryPanel({
                 {messages.length === 0 ? (
                   // Empty state with quick actions
                   <div className="text-center py-4">
-                    <Sparkles className="w-8 h-8 mx-auto mb-2 text-purple-500" />
-                    <p className="font-medium text-foreground mb-1">How can I help?</p>
+                    <div className="text-4xl mb-2">🍁</div>
+                    <p className="font-medium text-foreground mb-1">Hi! I'm Maple. How can I help?</p>
                     <p className="text-xs text-muted-foreground mb-4">
                       Ask me anything about your home
                     </p>
@@ -454,7 +456,7 @@ export function AIQueryPanel({
   );
 }
 
-export default AIQueryPanel;
+export default MapleChat;
 
 
 
