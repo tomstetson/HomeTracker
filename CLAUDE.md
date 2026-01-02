@@ -2,11 +2,26 @@
 
 > **Purpose**: This file provides continuity for AI coding assistants (Claude, Cursor, Windsurf, etc.) to understand the project's current state, architecture, and roadmap.
 > 
-> **Last Updated**: 2024-12-30 | **Version**: 2.0.0
+> **Last Updated**: 2025-01-02 | **Version**: 2.0.0
 
 ---
 
-## 📍 CURRENT STATUS: v2.0 Phase 2.1-2.4 Complete
+## 📍 CURRENT STATUS: v2.0 Phase 2.5 Prep Complete
+
+### Latest Session (Jan 2, 2025)
+**Commit `38fa263`**: Phase 2.5 preparation
+- ✅ Dashboard `/api/dashboard/summary` now returns real SQLite data (was stub)
+- ✅ Added Zod schemas for all entities (items, projects, maintenance, vendors, warranties, auth, ai-jobs)
+- ✅ Added middleware: error handling, rate limiting, request validation
+- ✅ Added PageErrorBoundary component for better error UX
+- ✅ Added store tests (authStore, documentStore, maintenanceStore)
+- ✅ Fixed npm audit vulnerabilities (qs, body-parser, express)
+- ✅ Added Snyk configuration for security scanning
+
+**Next Steps:**
+1. Build and test Docker container
+2. Implement Maple AI Assistant (Phase 2.5)
+3. Tag v2.0 release
 
 ### Release State
 - **v1.0**: ✅ Complete
@@ -477,10 +492,10 @@ cd frontend && npm run test:coverage
 ### Backend Notes
 | Package | Purpose | Status |
 |---------|---------|--------|
-| `@prisma/client` | Database ORM | **UNUSED** - Remove |
 | `passport`, `passport-jwt`, `bcrypt`, `jsonwebtoken` | Auth | Mock only - keep for future |
 | `tesseract.js` | OCR | Required - documents |
 | `heic-convert` | iOS photos | Required - file uploads |
+| `zod` | Schema validation | Required - API validation |
 
 ---
 
