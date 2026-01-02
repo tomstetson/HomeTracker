@@ -1,0 +1,5 @@
+# Emporia Vue API client
+pyemvue==0.17.1
+
+# Required by pyemvue
+requests>=2.28.0

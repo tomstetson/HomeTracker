@@ -42,8 +42,8 @@ RUN npm run build
 # Stage 3: Production Runtime
 FROM node:20-alpine AS production
 
-# Install nginx and supervisor
-RUN apk add --no-cache nginx supervisor curl
+# Install nginx, supervisor, curl, and Python for power monitoring
+RUN apk add --no-cache nginx supervisor curl python3 py3-pip
 
 # Create app user for security
 RUN addgroup -g 1001 -S hometracker && \
@@ -61,6 +61,11 @@ COPY --from=backend-builder /app/backend/package*.json ./backend/
 # Install production dependencies for backend
 WORKDIR /app/backend
 RUN npm ci --only=production && npm cache clean --force
+
+# Install Python worker for power monitoring (Emporia Vue)
+COPY backend/python/requirements.txt /app/backend/python/
+RUN pip3 install --no-cache-dir --break-system-packages -r /app/backend/python/requirements.txt
+COPY backend/python/ /app/backend/python/
 
 # Create data directory
 RUN mkdir -p /app/backend/data /app/backups && \

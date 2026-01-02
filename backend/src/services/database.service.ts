@@ -26,7 +26,7 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
 // Schema version for migrations
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /**
  * Database schema initialization
@@ -56,6 +56,7 @@ function initializeSchema(): void {
 function runMigrations(fromVersion: number): void {
   const migrations: Record<number, () => void> = {
     1: migration_v1_initial_schema,
+    2: migration_v2_power_tables,
   };
 
   for (let version = fromVersion + 1; version <= SCHEMA_VERSION; version++) {
@@ -489,6 +490,101 @@ function migration_v1_initial_schema(): void {
     INSERT OR IGNORE INTO users (id, email, name, role) VALUES ('default', 'user@hometracker.local', 'Home Owner', 'admin');
     INSERT OR IGNORE INTO properties (id, user_id, name, is_primary) VALUES ('default', 'default', 'My Home', 1);
   `);
+}
+
+/**
+ * Migration v2: Power monitoring tables (PowerTracker integration)
+ */
+function migration_v2_power_tables(): void {
+  db.exec(`
+    -- Power readings: Raw 2-second data (7-day retention)
+    CREATE TABLE IF NOT EXISTS power_readings_raw (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      total REAL NOT NULL,
+      phase_a REAL,
+      phase_b REAL,
+      circuits JSON
+    );
+    CREATE INDEX IF NOT EXISTS idx_power_raw_ts ON power_readings_raw(ts DESC);
+
+    -- Power readings: 1-minute aggregates (90-day retention)
+    CREATE TABLE IF NOT EXISTS power_readings_1min (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      total_avg REAL,
+      total_min REAL,
+      total_max REAL,
+      phase_a_avg REAL,
+      phase_b_avg REAL,
+      sample_count INTEGER,
+      circuits_avg JSON
+    );
+    CREATE INDEX IF NOT EXISTS idx_power_1min_ts ON power_readings_1min(ts DESC);
+
+    -- Power readings: Hourly summaries (forever)
+    CREATE TABLE IF NOT EXISTS power_readings_hourly (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      total_avg REAL,
+      total_min REAL,
+      total_max REAL,
+      total_kwh REAL,
+      phase_a_avg REAL,
+      phase_b_avg REAL,
+      peak_circuit TEXT,
+      peak_circuit_watts REAL,
+      anomaly_count INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_power_hourly_ts ON power_readings_hourly(ts DESC);
+
+    -- Adaptive learning baselines (168 slots: 7 days × 24 hours)
+    CREATE TABLE IF NOT EXISTS power_baselines (
+      day_of_week INTEGER NOT NULL,
+      hour INTEGER NOT NULL,
+      ema_average REAL DEFAULT 0,
+      ema_variance REAL DEFAULT 0,
+      sample_count INTEGER DEFAULT 0,
+      confidence REAL DEFAULT 0,
+      last_updated TEXT,
+      PRIMARY KEY (day_of_week, hour)
+    );
+
+    -- Power events/anomalies
+    CREATE TABLE IF NOT EXISTS power_events (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      description TEXT,
+      value REAL,
+      baseline REAL,
+      deviation REAL,
+      resolved INTEGER DEFAULT 0,
+      notified INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_power_events_ts ON power_events(ts DESC);
+
+    -- Power configuration
+    CREATE TABLE IF NOT EXISTS power_config (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Power learning status
+    CREATE TABLE IF NOT EXISTS power_learning_status (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      first_reading_ts INTEGER,
+      total_readings INTEGER DEFAULT 0,
+      confidence_pct REAL DEFAULT 0,
+      is_ready INTEGER DEFAULT 0,
+      last_updated TEXT DEFAULT (datetime('now'))
+    );
+    INSERT OR IGNORE INTO power_learning_status (id) VALUES (1);
+  `);
+  console.log('⚡ Power monitoring tables created');
 }
 
 // Initialize schema on module load

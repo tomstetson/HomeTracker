@@ -8,18 +8,66 @@
 
 ## 📍 CURRENT STATUS: v2.0 Phase 2.5 Prep Complete
 
-### Latest Session (Jan 2, 2025)
-**Commit `38fa263`**: Phase 2.5 preparation
-- ✅ Dashboard `/api/dashboard/summary` now returns real SQLite data (was stub)
-- ✅ Added Zod schemas for all entities (items, projects, maintenance, vendors, warranties, auth, ai-jobs)
-- ✅ Added middleware: error handling, rate limiting, request validation
-- ✅ Added PageErrorBoundary component for better error UX
-- ✅ Added store tests (authStore, documentStore, maintenanceStore)
-- ✅ Fixed npm audit vulnerabilities (qs, body-parser, express)
-- ✅ Added Snyk configuration for security scanning
+### Latest Session (Jan 2, 2025 - Evening)
+
+**Docker Build & Test** ✅
+- ✅ Fixed missing `@supabase/supabase-js` dependency in backend
+- ✅ Fixed missing `express-rate-limit` dependency in backend
+- ✅ Fixed healthcheck to use `curl` instead of `wget`
+- ✅ Removed deprecated `version` attribute from docker-compose.yml
+- ✅ Docker container builds and runs healthy
+- ✅ All API endpoints tested and working
+
+**Commits:**
+- `025fd9d` fix: Use curl instead of wget for healthcheck
+- `3360054` fix: Add missing backend dependencies for Docker build
+- `417e8dd` docs: Update CLAUDE.md with Jan 2 session progress
+- `38fa263` feat: Add validation middleware, Zod schemas, and fix dashboard endpoint
+
+---
+
+## 🔌 PLANNED: PowerTracker Integration (Power Monitoring Module)
+
+**Source**: https://github.com/tomstetson/PowerTracker (Python/Flask)
+**Goal**: Integrate Emporia Vue power monitoring as a HomeTracker module
+
+### Integration Architecture
+- **Hybrid approach**: Python worker (PyEmVue API) + Node.js (everything else)
+- **Single container**: Python process managed by Supervisor alongside Node.js
+- **Shared SQLite**: Power tables in hometracker.db
+
+### Data Retention Strategy (Multi-Year Efficient Storage)
+| Tier | Resolution | Retention | Size/Year |
+|------|------------|-----------|-----------|
+| Raw | 2-second | 7 days | ~30 MB |
+| Aggregated | 1-minute | 90 days | ~15 MB |
+| Historical | Hourly | Forever | ~5 MB |
+
+### Key Features to Port
+1. ✅ Live monitoring (2-second polling from Emporia Vue)
+2. ✅ Adaptive learning (EMA-based baseline with anomaly detection)
+3. ✅ Granular data backup with downsampling
+4. ⏳ Integration with existing notification system
+
+### Implementation Phases
+- **Phase 1**: Core infrastructure (Python worker, DB migrations) - IN PROGRESS
+- **Phase 2**: Data retention & downsampling
+- **Phase 3**: Adaptive learning & anomaly detection
+- **Phase 4**: API & real-time WebSocket
+- **Phase 5**: Frontend UI (Power.tsx page)
+
+### New Database Tables (Planned)
+- `power_readings_raw` - 2-second readings (7-day retention)
+- `power_readings_1min` - 1-minute aggregates (90-day retention)
+- `power_readings_hourly` - Hourly summaries (forever)
+- `power_baselines` - Adaptive learning (168 slots: 7 days × 24 hours)
+- `power_events` - Detected anomalies
+- `power_config` - Emporia credentials and settings
+
+---
 
 **Next Steps:**
-1. Build and test Docker container
+1. Implement PowerTracker Phase 1 (Python worker + DB migrations)
 2. Implement Maple AI Assistant (Phase 2.5)
 3. Tag v2.0 release
 
