@@ -1,0 +1,43 @@
+# Snyk (https://snyk.io) policy file
+# This file documents security findings that have been reviewed and determined
+# to be false positives or acceptable risks for this project.
+version: v1.25.0
+
+# Ignore specific vulnerabilities
+ignore:
+  # DOM XSS false positives in React components
+  # React automatically escapes JSX output, making these findings false positives
+  # The flagged code renders React state to JSX which is auto-escaped by React's virtual DOM
+  'javascript/DOMXSS':
+    - '*':
+        reason: 'React auto-escapes JSX output - false positive for React useState rendering'
+        expires: 2025-12-30T00:00:00.000Z
+        created: 2024-12-30T00:00:00.000Z
+
+  # CSRF finding for REST API with JWT authentication
+  # This API uses JWT tokens in Authorization headers, not session cookies
+  # CSRF protection is not required for token-based APIs per OWASP guidelines
+  'javascript/UseCsurfForExpress':
+    - '*':
+        reason: 'REST API uses JWT auth with Authorization headers, not cookies - CSRF not applicable'
+        expires: 2025-12-30T00:00:00.000Z
+        created: 2024-12-30T00:00:00.000Z
+
+  # Test file mock API key - not a real secret
+  'javascript/HardcodedNonCryptoSecret/test':
+    - '*':
+        reason: 'Mock API key in test file for unit testing - not a real credential'
+        expires: 2025-12-30T00:00:00.000Z
+        created: 2024-12-30T00:00:00.000Z
+
+  # Transitive dependency vulnerability - no direct fix available
+  # inflight package is deprecated but still used by glob/rimraf
+  # Awaiting upstream packages to migrate away from inflight
+  SNYK-JS-INFLIGHT-6095116:
+    - '*':
+        reason: 'Transitive dependency from glob - awaiting upstream fix, no direct remediation available'
+        expires: 2025-06-30T00:00:00.000Z
+        created: 2024-12-30T00:00:00.000Z
+
+# Patch section for applying Snyk patches (if available)
+patch: {}

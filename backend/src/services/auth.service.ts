@@ -31,13 +31,20 @@ const SALT_ROUNDS = 12;
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '7d';
 
-// Get JWT secret with fallback for development
+// Get JWT secret - requires environment variable
 const getJwtSecret = (): string => {
-  if (process.env.JWT_SECRET) {
-    return process.env.JWT_SECRET;
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('[SECURITY] JWT_SECRET environment variable is required in production');
+    }
+    console.warn('[SECURITY] JWT_SECRET not configured. Set JWT_SECRET in .env before deploying to production.');
+    // Only allow fallback in development - generate a random one per process
+    // This means tokens won't persist across restarts in dev, which is acceptable
+    const crypto = require('crypto');
+    return crypto.randomBytes(32).toString('hex');
   }
-  console.warn('[SECURITY] JWT_SECRET not configured. Using development secret. Set JWT_SECRET in .env for production.');
-  return 'dev-secret-change-in-production';
+  return secret;
 };
 
 const getRefreshSecret = (): string => {
@@ -301,8 +308,20 @@ export async function ensureDefaultAdmin(): Promise<void> {
   
   if (!existing) {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@hometracker.local';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'changeme123';
     const adminName = process.env.ADMIN_NAME || 'Admin';
+    
+    // Require ADMIN_PASSWORD env var or generate a secure random one
+    let adminPassword: string;
+    let passwordGenerated = false;
+    
+    if (process.env.ADMIN_PASSWORD) {
+      adminPassword = process.env.ADMIN_PASSWORD;
+    } else {
+      // Generate a secure random password if not provided
+      const crypto = require('crypto');
+      adminPassword = crypto.randomBytes(16).toString('base64url');
+      passwordGenerated = true;
+    }
 
     console.log('📝 Creating default admin user...');
     
@@ -317,6 +336,12 @@ export async function ensureDefaultAdmin(): Promise<void> {
     insertStmt.run(userId, adminEmail, adminName, passwordHash, 'admin', '{}', now, now);
 
     console.log(`✅ Default admin created: ${adminEmail}`);
-    console.log('⚠️  Change the default password after first login!');
+    if (passwordGenerated) {
+      console.log(`🔐 Generated admin password: ${adminPassword}`);
+      console.log('⚠️  Save this password! It will not be shown again.');
+      console.log('💡 Set ADMIN_PASSWORD in .env to use a fixed password.');
+    } else {
+      console.log('⚠️  Change the default password after first login!');
+    }
   }
 }

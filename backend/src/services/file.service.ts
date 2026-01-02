@@ -4,6 +4,39 @@ import { v4 as uuidv4 } from 'uuid';
 import Tesseract from 'tesseract.js';
 import heicConvert from 'heic-convert';
 
+/**
+ * Sanitize filename to prevent path traversal attacks
+ * Removes directory traversal sequences and invalid characters
+ */
+function sanitizeFilename(filename: string): string {
+  // Remove any directory traversal attempts
+  let sanitized = filename
+    .replace(/\.\./g, '') // Remove ..
+    .replace(/\.\/|\.\\/g, '') // Remove ./ and .\
+    .replace(/[\/\\]/g, '') // Remove path separators
+    .replace(/[\x00-\x1f\x80-\x9f]/g, '') // Remove control characters
+    .replace(/[<>:"|?*]/g, ''); // Remove Windows invalid chars
+  
+  // Get just the basename in case any path components remain
+  sanitized = path.basename(sanitized);
+  
+  // Ensure it's not empty after sanitization
+  if (!sanitized || sanitized === '.' || sanitized === '..') {
+    return 'unnamed_file';
+  }
+  
+  return sanitized;
+}
+
+/**
+ * Validate that a file path is within the allowed directory
+ */
+function isPathWithinDirectory(filePath: string, directory: string): boolean {
+  const resolvedPath = path.resolve(filePath);
+  const resolvedDir = path.resolve(directory);
+  return resolvedPath.startsWith(resolvedDir + path.sep) || resolvedPath === resolvedDir;
+}
+
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../../data');
 const FILES_DIR = path.join(DATA_DIR, 'files');
 const THUMBNAILS_DIR = path.join(DATA_DIR, 'thumbnails');
@@ -130,7 +163,10 @@ export const fileService = {
     const id = uuidv4();
     let processedBuffer = buffer;
     let processedMimeType = mimeType;
-    let ext = path.extname(originalName) || '.bin';
+    
+    // Sanitize the original filename to prevent path traversal
+    const sanitizedName = sanitizeFilename(originalName);
+    let ext = path.extname(sanitizedName) || '.bin';
     
     // Convert HEIC to JPEG for better compatibility
     if (isHeicFormat(mimeType)) {
@@ -151,9 +187,14 @@ export const fileService = {
     // Write file to disk
     fs.writeFileSync(filePath, processedBuffer);
 
+    // Verify the file path is within the allowed directory
+    if (!isPathWithinDirectory(filePath, FILES_DIR)) {
+      throw new Error('Invalid file path detected');
+    }
+
     const fileInfo: StoredFile = {
       id,
-      originalName,
+      originalName: sanitizedName,
       filename,
       path: `/files/${filename}`,
       mimeType: processedMimeType,
@@ -216,9 +257,17 @@ export const fileService = {
     return metadata.files.find((f) => f.id === fileId) || null;
   },
 
-  // Get file path on disk
+  // Get file path on disk (with path traversal protection)
   getFilePath(filename: string): string {
-    return path.join(FILES_DIR, filename);
+    const sanitized = sanitizeFilename(filename);
+    const filePath = path.join(FILES_DIR, sanitized);
+    
+    // Verify the resolved path is within FILES_DIR
+    if (!isPathWithinDirectory(filePath, FILES_DIR)) {
+      throw new Error('Invalid file path');
+    }
+    
+    return filePath;
   },
 
   // Get all files

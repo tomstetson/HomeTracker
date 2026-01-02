@@ -37,16 +37,64 @@ import { backupSchedulerService } from './services/backup-scheduler.service';
 import { ensureDefaultAdmin } from './services/auth.service';
 import { notificationSchedulerService } from './services/notification-scheduler.service';
 
+// Import rate limiting middleware
+import { apiLimiter, authLimiter, aiLimiter, uploadLimiter } from './middleware/rateLimit.middleware';
+
+// Import error handling middleware
+import { errorHandler, notFoundHandler } from './middleware/error.middleware';
+
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for LAN access
 
 // Middleware
 app.use(helmet({ contentSecurityPolicy: false }));
-// CORS - allow all origins for homelab LAN access
-app.use(cors({ 
-  origin: true, // Allow all origins
-  credentials: true 
+
+// CORS Configuration - Secure with homelab flexibility
+const getAllowedOrigins = (): cors.CorsOptions['origin'] => {
+  const origins = [
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8080',
+  ];
+  
+  // Add configured origins from env (comma-separated)
+  if (process.env.ALLOWED_ORIGINS) {
+    origins.push(...process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()));
+  }
+  
+  // For homelab: allow same-network requests (default: true for homelab use)
+  const allowLan = process.env.ALLOW_LAN !== 'false';
+  
+  if (allowLan) {
+    return (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (same-origin, mobile apps, curl, Postman)
+      if (!origin) return callback(null, true);
+      
+      // Allow configured origins
+      if (origins.includes(origin)) return callback(null, true);
+      
+      // Allow LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+      const lanPattern = /^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+      if (lanPattern.test(origin)) return callback(null, true);
+      
+      // Allow Tailscale IPs (100.x.x.x)
+      const tailscalePattern = /^https?:\/\/100\.\d+\.\d+\.\d+(:\d+)?$/;
+      if (tailscalePattern.test(origin)) return callback(null, true);
+      
+      callback(new Error('Not allowed by CORS'));
+    };
+  }
+  
+  return origins;
+};
+
+app.use(cors({
+  origin: getAllowedOrigins(),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 app.use(compression());
 app.use(morgan('dev'));
@@ -62,6 +110,13 @@ app.get('/health', (req: Request, res: Response) => {
     version: '1.0.0',
   });
 });
+
+// Rate limiting - apply different limits to different route groups
+app.use('/api/', apiLimiter); // General API limit
+app.use('/api/auth', authLimiter); // Stricter auth limit
+app.use('/api/ai-jobs', aiLimiter); // AI operations limit
+app.use('/api/images', uploadLimiter); // Upload limit
+app.use('/api/files', uploadLimiter); // Upload limit
 
 // API Routes
 app.use('/api/items', itemRoutes);
@@ -101,10 +156,11 @@ app.put('/api/settings', (req: Request, res: Response) => {
   }
 });
 
-// 404 handler
-app.use((req: Request, res: Response) => {
-  res.status(404).json({ success: false, error: { message: 'Route not found' } });
-});
+// 404 handler for undefined routes
+app.use(notFoundHandler);
+
+// Global error handler - must be last
+app.use(errorHandler);
 
 // Graceful shutdown handling
 const shutdown = async (signal: string) => {

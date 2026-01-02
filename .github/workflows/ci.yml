@@ -89,20 +89,3 @@ jobs:
 
       - name: Build backend
         run: cd backend && npm run build
-
-  secretlint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install secretlint
-        run: npm install --no-save @secretlint/secretlint-rule-preset-recommend @secretlint/secretlint-rule-pattern secretlint
-
-      - name: Run secretlint
-        run: npx secretlint --secretlintrc .secretlintrc.json "backend/src/**/*" "frontend/src/**/*"

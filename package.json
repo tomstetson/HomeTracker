@@ -12,6 +12,7 @@
     "lint-staged": "^15.0.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.89.0"
+    "@supabase/supabase-js": "^2.89.0",
+    "express-rate-limit": "^8.2.1"
   }
 }

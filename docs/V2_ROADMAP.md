@@ -640,25 +640,843 @@ const MapleChat = () => {
 
 ---
 
-## Technical Debt Items
+## Phase 2.6: Technical Debt Resolution (REQUIRED BEFORE MAPLE AI)
 
-| Item | Location | Priority | Status |
-|------|----------|----------|--------|
-| Add comprehensive test coverage | All stores | High | Partial |
-| Implement proper error boundaries | All pages | Medium | Pending |
-| Add E2E tests with Playwright | New | Medium | Pending |
-| Document all API endpoints | Backend | High | Partial |
-| Add request rate limiting | Backend | Medium | Pending |
-| ~~Add API response caching~~ | api.ts | ~~Medium~~ | ✅ Done (PWA) |
-| ~~Optimize large list rendering~~ | Items.tsx | ~~Low~~ | ✅ Done |
+> **CRITICAL:** All items marked as **Critical** or **High** priority MUST be completed before starting Phase 2.5 (Maple AI). This ensures a stable, secure, and maintainable foundation for the AI assistant.
+
+---
+
+### TD-1: Test Coverage (Critical Priority)
+
+**Current State:** 11 test files exist in frontend, 0 in backend. ~30% coverage of critical paths.
+
+#### TD-1.1: Frontend Store Tests
+**Problem:** Only 4 of 15 stores have unit tests.  
+**Impact:** Regressions in state management go undetected.  
+**Effort:** 5-7 days
+
+| Store | Has Tests | Priority | Complexity |
+|-------|-----------|----------|------------|
+| `projectStore.ts` | ✅ | - | - |
+| `notificationStore.ts` | ✅ | - | - |
+| `inventoryStore.ts` | ✅ | - | - |
+| `diagramStore.ts` | ✅ | - | - |
+| `authStore.ts` | ❌ | Critical | Medium |
+| `budgetStore.ts` | ❌ | High | High |
+| `documentStore.ts` | ❌ | High | Medium |
+| `maintenanceStore.ts` | ❌ | High | Medium |
+| `warrantyStore.ts` | ❌ | High | Medium |
+| `vendorStore.ts` | ❌ | Medium | Low |
+| `aiSettingsStore.ts` | ❌ | High | Medium |
+| `homeVitalsStore.ts` | ❌ | Medium | Low |
+| `inventoryStagingStore.ts` | ❌ | Medium | Medium |
+| `optionsStore.ts` | ❌ | Low | Low |
+| `propertyValueStore.ts` | ❌ | Low | Low |
+
+**Implementation Pattern:**
+```typescript
+// Example: authStore.test.ts
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { useAuthStore } from './authStore';
+
+describe('authStore', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ user: null, isAuthenticated: false });
+  });
+
+  it('should initialize with default state', () => {
+    const state = useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.user).toBeNull();
+  });
+
+  it('should handle login', async () => {
+    // Mock Supabase client
+    vi.mock('../lib/supabase', () => ({
+      supabase: { auth: { signInWithPassword: vi.fn() } }
+    }));
+    // Test login flow
+  });
+});
+```
+
+**Files to Create:**
+- `frontend/src/store/authStore.test.ts`
+- `frontend/src/store/budgetStore.test.ts`
+- `frontend/src/store/documentStore.test.ts`
+- `frontend/src/store/maintenanceStore.test.ts`
+- `frontend/src/store/warrantyStore.test.ts`
+- `frontend/src/store/vendorStore.test.ts`
+- `frontend/src/store/aiSettingsStore.test.ts`
+- `frontend/src/store/homeVitalsStore.test.ts`
+- `frontend/src/store/inventoryStagingStore.test.ts`
+- `frontend/src/store/optionsStore.test.ts`
+- `frontend/src/store/propertyValueStore.test.ts`
+
+---
+
+#### TD-1.2: Frontend Library Tests
+**Problem:** Only 5 of 12 library files have tests.  
+**Impact:** Core utilities may have edge case bugs.  
+**Effort:** 3-4 days
+
+| Library | Has Tests | Priority | Notes |
+|---------|-----------|----------|-------|
+| `notificationService.ts` | ✅ | - | - |
+| `propertyValueService.ts` | ✅ | - | - |
+| `maintenanceAutomation.ts` | ✅ | - | - |
+| `imageAnalysis.ts` | ✅ | - | - |
+| `documentExtraction.ts` | ✅ | - | - |
+| `api.ts` | ❌ | Critical | Core API layer |
+| `aiService.ts` | ❌ | Critical | AI integration |
+| `autoSync.ts` | ❌ | High | Data sync logic |
+| `dataSync.ts` | ❌ | High | Data sync logic |
+| `fileApi.ts` | ❌ | Medium | File operations |
+| `homeContext.ts` | ❌ | High | Context builder for AI |
+| `realtimeSync.ts` | ❌ | Medium | Real-time updates |
+
+**Files to Create:**
+- `frontend/src/lib/api.test.ts`
+- `frontend/src/lib/aiService.test.ts`
+- `frontend/src/lib/autoSync.test.ts`
+- `frontend/src/lib/dataSync.test.ts`
+- `frontend/src/lib/fileApi.test.ts`
+- `frontend/src/lib/homeContext.test.ts`
+- `frontend/src/lib/realtimeSync.test.ts`
+
+---
+
+#### TD-1.3: Backend Unit Tests
+**Problem:** Zero test files in backend.  
+**Impact:** API regressions, service bugs go undetected.  
+**Effort:** 7-10 days
+
+| Service | Priority | Complexity | Test Focus |
+|---------|----------|------------|------------|
+| `database.service.ts` | Critical | High | CRUD operations, migrations |
+| `auth.service.ts` | Critical | Medium | JWT, user management |
+| `ai-batch-processor.service.ts` | Critical | High | Job processing, AI calls |
+| `image-storage.service.ts` | High | Medium | Upload, thumbnail generation |
+| `backup-scheduler.service.ts` | High | Medium | Backup creation, restoration |
+| `excel.service.ts` | High | High | Data import/export |
+| `notification-scheduler.service.ts` | Medium | Medium | Scheduling, delivery |
+| `ai-suggestions.service.ts` | Medium | Medium | Suggestion generation |
+| `maintenance-checker.service.ts` | Medium | Low | Due date checking |
+| `file.service.ts` | Medium | Low | File operations |
+| `email.service.ts` | Low | Low | Email sending |
+
+**Setup Required:**
+```bash
+# Install test dependencies
+cd backend
+npm install -D vitest @vitest/coverage-v8 supertest @types/supertest
+```
+
+**Add to `backend/package.json`:**
+```json
+{
+  "scripts": {
+    "test": "vitest",
+    "test:coverage": "vitest --coverage"
+  }
+}
+```
+
+**Implementation Pattern:**
+```typescript
+// backend/src/services/database.service.test.ts
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { databaseService } from './database.service';
+
+describe('databaseService', () => {
+  beforeAll(() => {
+    // Use in-memory SQLite for tests
+    process.env.DATABASE_PATH = ':memory:';
+  });
+
+  it('should create tables on initialization', () => {
+    const tables = databaseService.getTables();
+    expect(tables).toContain('items');
+    expect(tables).toContain('users');
+  });
+
+  it('should perform CRUD operations', () => {
+    const item = databaseService.createItem({ name: 'Test', category: 'Test' });
+    expect(item.id).toBeDefined();
+    
+    const retrieved = databaseService.getItem(item.id);
+    expect(retrieved.name).toBe('Test');
+  });
+});
+```
+
+**Files to Create:**
+- `backend/src/services/database.service.test.ts`
+- `backend/src/services/auth.service.test.ts`
+- `backend/src/services/ai-batch-processor.service.test.ts`
+- `backend/src/services/image-storage.service.test.ts`
+- `backend/src/services/backup-scheduler.service.test.ts`
+- `backend/src/services/excel.service.test.ts`
+- `backend/src/services/notification-scheduler.service.test.ts`
+
+---
+
+#### TD-1.4: E2E Tests with Playwright
+**Problem:** No end-to-end tests exist.  
+**Impact:** User workflows may break without detection.  
+**Effort:** 5-7 days
+
+**Setup:**
+```bash
+npm init playwright@latest
+```
+
+**Critical User Flows to Test:**
+
+| Flow | Priority | Pages Involved |
+|------|----------|----------------|
+| Authentication (login/logout) | Critical | Login, Register |
+| Add item with image | Critical | Items, ImageGallery |
+| Create and complete project | High | Projects |
+| Add warranty with reminder | High | Warranties |
+| Schedule maintenance task | High | Maintenance |
+| Backup and restore | High | Backup, Settings |
+| AI job creation and monitoring | High | InventoryWizard, AIJobMonitor |
+| Global search | Medium | All pages |
+| Data export to Excel | Medium | Settings |
+
+**Implementation Pattern:**
+```typescript
+// e2e/inventory.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Inventory Management', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    // Login if auth enabled
+  });
+
+  test('should add a new item', async ({ page }) => {
+    await page.goto('/items');
+    await page.click('button:has-text("Add Item")');
+    await page.fill('input[name="name"]', 'Test Refrigerator');
+    await page.selectOption('select[name="category"]', 'Appliances');
+    await page.click('button:has-text("Save")');
+    
+    await expect(page.locator('text=Test Refrigerator')).toBeVisible();
+  });
+
+  test('should upload image to item', async ({ page }) => {
+    await page.goto('/items');
+    // ... image upload test
+  });
+});
+```
+
+**Files to Create:**
+- `e2e/auth.spec.ts`
+- `e2e/inventory.spec.ts`
+- `e2e/projects.spec.ts`
+- `e2e/warranties.spec.ts`
+- `e2e/maintenance.spec.ts`
+- `e2e/backup.spec.ts`
+- `e2e/ai-jobs.spec.ts`
+- `e2e/search.spec.ts`
+- `playwright.config.ts`
+
+---
+
+### TD-2: Error Handling (High Priority)
+
+#### TD-2.1: Granular Error Boundaries
+**Problem:** Single ErrorBoundary at App level catches all errors with same UI.  
+**Impact:** Users lose entire page state on any error; poor UX.  
+**Effort:** 2-3 days
+
+**Current State:**
+```
+App.tsx
+└── ErrorBoundary (catches everything)
+    └── All Routes
+```
+
+**Target State:**
+```
+App.tsx
+└── ErrorBoundary (app-level fallback)
+    └── Layout
+        └── Each Page with own ErrorBoundary
+            └── Critical sections with granular boundaries
+```
+
+**Implementation:**
+```tsx
+// components/PageErrorBoundary.tsx
+export const PageErrorBoundary = ({ 
+  children, 
+  pageName,
+  onRetry 
+}: { 
+  children: ReactNode; 
+  pageName: string;
+  onRetry?: () => void;
+}) => (
+  <ErrorBoundary
+    fallback={
+      <PageErrorFallback 
+        pageName={pageName} 
+        onRetry={onRetry}
+      />
+    }
+    onError={(error) => {
+      // Log to error tracking service
+      console.error(`Error in ${pageName}:`, error);
+    }}
+  >
+    {children}
+  </ErrorBoundary>
+);
+
+// Usage in App.tsx routes
+<Route path="/items" element={
+  <PageErrorBoundary pageName="Inventory" onRetry={() => window.location.reload()}>
+    <Items />
+  </PageErrorBoundary>
+} />
+```
+
+**Pages to Wrap:**
+- Dashboard, Items, Projects, Maintenance, Warranties
+- Vendors, Documents, Diagrams, HomeInfo, Budget
+- Settings, Backup, InventoryWizard
+
+---
+
+#### TD-2.2: Backend Global Error Handler
+**Problem:** No centralized error handling; errors swallowed with generic messages.  
+**Impact:** Debugging is difficult; inconsistent error responses.  
+**Effort:** 1-2 days
+
+**Current Pattern (Bad):**
+```typescript
+router.post('/', (req, res) => {
+  try {
+    const item = excelService.createItem(req.body);
+    res.json({ success: true, data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to create item' });
+    // Error details lost!
+  }
+});
+```
+
+**Target Pattern:**
+```typescript
+// middleware/error.middleware.ts
+export class AppError extends Error {
+  constructor(
+    public statusCode: number,
+    public message: string,
+    public isOperational = true
+  ) {
+    super(message);
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export const errorHandler = (
+  err: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      success: false,
+      error: {
+        message: err.message,
+        code: err.statusCode,
+      }
+    });
+  }
+
+  // Log unexpected errors
+  console.error('Unexpected error:', err);
+
+  // Don't leak error details in production
+  const message = process.env.NODE_ENV === 'production' 
+    ? 'Internal server error' 
+    : err.message;
+
+  res.status(500).json({
+    success: false,
+    error: { message, code: 500 }
+  });
+};
+
+// Usage in routes
+router.post('/', asyncHandler(async (req, res) => {
+  const item = await excelService.createItem(req.body);
+  if (!item) throw new AppError(400, 'Failed to create item');
+  res.json({ success: true, data: item });
+}));
+```
+
+**Files to Create/Modify:**
+- `backend/src/middleware/error.middleware.ts` (new)
+- `backend/src/middleware/asyncHandler.ts` (new)
+- `backend/src/server.ts` (add error handler)
+- All route files (refactor to use asyncHandler)
+
+---
+
+### TD-3: API Security (High Priority)
+
+#### TD-3.1: Rate Limiting
+**Problem:** No rate limiting; API vulnerable to abuse/DoS.  
+**Impact:** Service can be overwhelmed; resource exhaustion.  
+**Effort:** 1 day
+
+**Implementation:**
+```typescript
+// middleware/rateLimit.middleware.ts
+import rateLimit from 'express-rate-limit';
+
+// General API rate limit
+export const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per window
+  message: {
+    success: false,
+    error: { message: 'Too many requests, please try again later', code: 429 }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter limit for auth endpoints
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10, // 10 login attempts per 15 min
+  message: {
+    success: false,
+    error: { message: 'Too many login attempts', code: 429 }
+  },
+});
+
+// Stricter limit for AI endpoints (expensive operations)
+export const aiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // 20 AI jobs per hour
+  message: {
+    success: false,
+    error: { message: 'AI rate limit exceeded', code: 429 }
+  },
+});
+
+// server.ts
+app.use('/api/', apiLimiter);
+app.use('/api/auth', authLimiter);
+app.use('/api/ai-jobs', aiLimiter);
+```
+
+**Dependencies to Add:**
+```bash
+cd backend
+npm install express-rate-limit
+```
+
+---
+
+#### TD-3.2: Input Validation with Zod
+**Problem:** No schema validation on API inputs.  
+**Impact:** Invalid data can corrupt database; potential injection vectors.  
+**Effort:** 3-4 days
+
+**Implementation Pattern:**
+```typescript
+// schemas/item.schema.ts
+import { z } from 'zod';
+
+export const createItemSchema = z.object({
+  name: z.string().min(1).max(200),
+  category: z.string().min(1).max(100),
+  location: z.string().max(200).optional(),
+  purchaseDate: z.string().datetime().optional(),
+  purchasePrice: z.number().positive().optional(),
+  currentValue: z.number().positive().optional(),
+  serialNumber: z.string().max(100).optional(),
+  notes: z.string().max(5000).optional(),
+});
+
+export const updateItemSchema = createItemSchema.partial();
+
+// middleware/validate.middleware.ts
+import { ZodSchema } from 'zod';
+
+export const validate = (schema: ZodSchema) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Validation failed',
+          details: result.error.flatten(),
+        }
+      });
+    }
+    req.body = result.data; // Use validated/transformed data
+    next();
+  };
+};
+
+// Usage in routes
+router.post('/', validate(createItemSchema), (req, res) => {
+  // req.body is now validated and typed
+});
+```
+
+**Schemas to Create:**
+- `backend/src/schemas/item.schema.ts`
+- `backend/src/schemas/project.schema.ts`
+- `backend/src/schemas/warranty.schema.ts`
+- `backend/src/schemas/maintenance.schema.ts`
+- `backend/src/schemas/vendor.schema.ts`
+- `backend/src/schemas/document.schema.ts`
+- `backend/src/schemas/ai-job.schema.ts`
+- `backend/src/schemas/auth.schema.ts`
+
+**Dependencies to Add:**
+```bash
+cd backend
+npm install zod
+```
+
+---
+
+#### TD-3.3: CORS Configuration
+**Problem:** CORS allows all origins (`origin: true`).  
+**Impact:** Any site can make requests to the API.  
+**Effort:** 0.5 days
+
+**Current (Insecure):**
+```typescript
+app.use(cors({ origin: true, credentials: true }));
+```
+
+**Target (Secure with Homelab Flexibility):**
+```typescript
+const getAllowedOrigins = () => {
+  const origins = [
+    'http://localhost:3000',
+    'http://localhost:8080',
+  ];
+  
+  // Add configured origins from env
+  if (process.env.ALLOWED_ORIGINS) {
+    origins.push(...process.env.ALLOWED_ORIGINS.split(','));
+  }
+  
+  // For homelab: allow same-network requests
+  if (process.env.ALLOW_LAN === 'true') {
+    return (origin: string | undefined, callback: Function) => {
+      // Allow requests with no origin (same-origin, mobile apps, curl)
+      if (!origin) return callback(null, true);
+      
+      // Allow configured origins
+      if (origins.includes(origin)) return callback(null, true);
+      
+      // Allow LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+      const lanPattern = /^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+      if (lanPattern.test(origin)) return callback(null, true);
+      
+      callback(new Error('Not allowed by CORS'));
+    };
+  }
+  
+  return origins;
+};
+
+app.use(cors({
+  origin: getAllowedOrigins(),
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+```
+
+---
+
+### TD-4: API Documentation (Medium Priority)
+
+#### TD-4.1: OpenAPI/Swagger Documentation
+**Problem:** No formal API documentation; 17 route files undocumented.  
+**Impact:** Difficult for future development; no API contract.  
+**Effort:** 3-4 days
+
+**Implementation:**
+```bash
+cd backend
+npm install swagger-jsdoc swagger-ui-express
+npm install -D @types/swagger-jsdoc @types/swagger-ui-express
+```
+
+```typescript
+// swagger.ts
+import swaggerJSDoc from 'swagger-jsdoc';
+
+const options: swaggerJSDoc.Options = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'HomeTracker API',
+      version: '2.0.0',
+      description: 'API for HomeTracker home management application',
+    },
+    servers: [
+      { url: 'http://localhost:3001', description: 'Development' },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+  },
+  apis: ['./src/routes/*.ts', './src/schemas/*.ts'],
+};
+
+export const swaggerSpec = swaggerJSDoc(options);
+
+// server.ts
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './swagger';
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+```
+
+**Route Documentation Pattern:**
+```typescript
+/**
+ * @swagger
+ * /api/items:
+ *   get:
+ *     summary: Get all items
+ *     tags: [Items]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of items
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Item'
+ */
+router.get('/', (req, res) => { ... });
+```
+
+**Routes to Document:**
+- `item.routes.ts` - Items CRUD
+- `warranty.routes.ts` - Warranties CRUD
+- `maintenance.routes.ts` - Maintenance tasks
+- `project.routes.ts` - Projects CRUD
+- `vendor.routes.ts` - Vendors CRUD
+- `document.routes.ts` - Documents CRUD
+- `images.routes.ts` - Image upload/management
+- `ai-jobs.routes.ts` - AI job management
+- `storage.routes.ts` - Storage providers
+- `auth.routes.ts` - Authentication
+- `sync.routes.ts` - Data sync
+- `property.routes.ts` - Property management
+- `notifications.routes.ts` - Notifications
+- `suggestions.routes.ts` - AI suggestions
+- `excel.routes.ts` - Excel export
+- `file.routes.ts` - File operations
+- `dashboard.routes.ts` - Dashboard data
+
+---
+
+### TD-5: Code Quality (Medium Priority)
+
+#### TD-5.1: Resolve TODO Comments
+**Problem:** Unfinished functionality marked with TODO.  
+**Impact:** Features incomplete or forgotten.  
+**Effort:** 1-2 days
+
+| Location | TODO | Priority | Action |
+|----------|------|----------|--------|
+| `backup-scheduler.service.ts:457` | "Implement actual data restoration" | High | Complete backup restore feature |
+
+**Implementation for Backup Restore:**
+```typescript
+async restoreBackup(filename: string): Promise<{ success: boolean; message: string }> {
+  const backupPath = path.join(this.localBackupDir, filename);
+  
+  if (!fs.existsSync(backupPath)) {
+    return { success: false, message: 'Backup file not found' };
+  }
+
+  try {
+    // 1. Create safety backup of current data
+    await this.createSafetyBackup();
+    
+    // 2. Extract backup archive
+    const tempDir = path.join(this.localBackupDir, 'restore_temp');
+    await this.extractBackup(backupPath, tempDir);
+    
+    // 3. Validate backup structure
+    const isValid = await this.validateBackupStructure(tempDir);
+    if (!isValid) {
+      throw new Error('Invalid backup structure');
+    }
+    
+    // 4. Stop background services
+    this.pauseScheduler();
+    
+    // 5. Replace database
+    const dbBackup = path.join(tempDir, 'hometracker.db');
+    if (fs.existsSync(dbBackup)) {
+      databaseService.close();
+      fs.copyFileSync(dbBackup, databaseService.getDbPath());
+      databaseService.reconnect();
+    }
+    
+    // 6. Replace uploads
+    const uploadsBackup = path.join(tempDir, 'uploads');
+    if (fs.existsSync(uploadsBackup)) {
+      fs.rmSync(this.uploadsDir, { recursive: true, force: true });
+      fs.cpSync(uploadsBackup, this.uploadsDir, { recursive: true });
+    }
+    
+    // 7. Restart services
+    this.resumeScheduler();
+    
+    // 8. Cleanup
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    
+    return { success: true, message: `Restored from ${filename}` };
+  } catch (error) {
+    // Attempt to restore from safety backup
+    await this.restoreSafetyBackup();
+    return { success: false, message: `Restore failed: ${error.message}` };
+  }
+}
+```
+
+---
+
+#### TD-5.2: Consistent Error Messages
+**Problem:** Error messages vary in format across routes.  
+**Impact:** Frontend error handling is inconsistent.  
+**Effort:** 1 day
+
+**Current (Inconsistent):**
+```typescript
+// Some routes
+res.status(500).json({ success: false, error: 'Failed to get items' });
+
+// Other routes
+res.status(500).json({ success: false, error: { message: 'Failed' } });
+
+// Yet others
+res.status(500).json({ error: 'Something went wrong' });
+```
+
+**Target (Consistent):**
+```typescript
+// All error responses follow this structure
+interface ErrorResponse {
+  success: false;
+  error: {
+    message: string;
+    code: number;
+    details?: unknown; // Validation errors, etc.
+  };
+}
+
+// Create helper
+const errorResponse = (res: Response, status: number, message: string, details?: unknown) => {
+  res.status(status).json({
+    success: false,
+    error: { message, code: status, details }
+  });
+};
+```
+
+---
+
+### TD-6: Performance (Low Priority)
+
+#### TD-6.1: Database Query Optimization
+**Problem:** Some queries may be inefficient as data grows.  
+**Impact:** Slow response times with large datasets.  
+**Effort:** 2-3 days (when needed)
+
+**Items to Review:**
+- Add indexes for common query patterns
+- Implement pagination for list endpoints
+- Add query caching for frequently accessed data
+
+---
+
+### Technical Debt Tracking Summary
+
+| ID | Item | Priority | Effort | Status |
+|----|------|----------|--------|--------|
+| **TD-1.1** | Frontend store tests | Critical | 5-7 days | ⏳ Pending |
+| **TD-1.2** | Frontend library tests | Critical | 3-4 days | ⏳ Pending |
+| **TD-1.3** | Backend unit tests | Critical | 7-10 days | 🔄 In Progress (100 tests) |
+| **TD-1.4** | E2E tests (Playwright) | High | 5-7 days | ⏳ Pending |
+| **TD-2.1** | Granular error boundaries | High | 2-3 days | ✅ Complete |
+| **TD-2.2** | Backend error handler | High | 1-2 days | ✅ Complete |
+| **TD-3.1** | Rate limiting | High | 1 day | ✅ Complete |
+| **TD-3.2** | Input validation (Zod) | High | 3-4 days | ✅ Complete |
+| **TD-3.3** | CORS configuration | High | 0.5 days | ✅ Complete |
+| **TD-4.1** | API documentation | Medium | 3-4 days | ⏳ Pending |
+| **TD-5.1** | Resolve TODOs | Medium | 1-2 days | ⏳ Pending |
+| **TD-5.2** | Consistent error messages | Medium | 1 day | ⏳ Pending |
+| **TD-6.1** | Database optimization | Low | 2-3 days | ⏳ Deferred |
+
+**Total Estimated Effort:** 35-50 days (~9 days completed)
+
+**Recommended Order:**
+1. **Week 1-2:** TD-3.1 (Rate limiting), TD-3.2 (Validation), TD-3.3 (CORS), TD-2.2 (Backend errors)
+2. **Week 3-4:** TD-1.3 (Backend tests), TD-2.1 (Error boundaries)
+3. **Week 5-6:** TD-1.1 (Store tests), TD-1.2 (Library tests)
+4. **Week 7-8:** TD-1.4 (E2E tests), TD-4.1 (API docs)
+5. **Week 9:** TD-5.1 (TODOs), TD-5.2 (Error messages)
 
 ---
 
 ## Conclusion
 
-HomeTracker v2.0 has achieved all core phase goals (2.1-2.4). Phase 2.5 (Maple AI Assistant) is the final major feature before v3.0. The application is production-ready for homelab deployment.
+HomeTracker v2.0 has achieved all core phase goals (2.1-2.4). **Phase 2.6 (Technical Debt Resolution) is now REQUIRED before proceeding to Phase 2.5 (Maple AI).** This ensures Maple is built on a stable, secure, and well-tested foundation.
 
 **Phase Status:**
 - Phase 2.1-2.4: ✅ Complete
-- Phase 2.5: ⏳ Planned (Maple AI)
+- **Phase 2.6: ⏳ In Progress (Technical Debt - REQUIRED)**
+- Phase 2.5: 🔒 Blocked (Maple AI - waiting on Phase 2.6)
 - v3.0+: Future backlog
+
+**Critical Path to Maple AI:**
+```
+Phase 2.6 Technical Debt (35-50 days)
+├── TD-3: API Security (Week 1-2) ──────────┐
+├── TD-2: Error Handling (Week 2) ──────────┤
+├── TD-1.3: Backend Tests (Week 3-4) ───────┤
+├── TD-1.1-1.2: Frontend Tests (Week 5-6) ──┼──► Phase 2.5: Maple AI (10-14 days)
+├── TD-1.4: E2E Tests (Week 7-8) ───────────┤
+└── TD-4-5: Docs & Quality (Week 9) ────────┘
+```

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from './lib/theme';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { PageErrorBoundary } from './components/PageErrorBoundary';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
@@ -71,19 +72,71 @@ function AppContent() {
         <ProtectedRoute>
           <Layout>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/items" element={<Items />} />
-              <Route path="/inventory-wizard" element={<InventoryWizard />} />
-              <Route path="/maintenance" element={<Maintenance />} />
-              <Route path="/vendors" element={<Vendors />} />
-              <Route path="/documents" element={<Documents />} />
-              <Route path="/diagrams" element={<Diagrams />} />
-              <Route path="/home-info" element={<HomeInfo />} />
-              <Route path="/budget" element={<Budget />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/warranties" element={<Warranties />} />
-              <Route path="/backup" element={<Backup />} />
+              <Route path="/" element={
+                <PageErrorBoundary pageName="Dashboard">
+                  <Dashboard />
+                </PageErrorBoundary>
+              } />
+              <Route path="/projects" element={
+                <PageErrorBoundary pageName="Projects" showBackButton>
+                  <Projects />
+                </PageErrorBoundary>
+              } />
+              <Route path="/items" element={
+                <PageErrorBoundary pageName="Inventory" showBackButton>
+                  <Items />
+                </PageErrorBoundary>
+              } />
+              <Route path="/inventory-wizard" element={
+                <PageErrorBoundary pageName="Inventory Wizard" showBackButton>
+                  <InventoryWizard />
+                </PageErrorBoundary>
+              } />
+              <Route path="/maintenance" element={
+                <PageErrorBoundary pageName="Maintenance" showBackButton>
+                  <Maintenance />
+                </PageErrorBoundary>
+              } />
+              <Route path="/vendors" element={
+                <PageErrorBoundary pageName="Vendors" showBackButton>
+                  <Vendors />
+                </PageErrorBoundary>
+              } />
+              <Route path="/documents" element={
+                <PageErrorBoundary pageName="Documents" showBackButton>
+                  <Documents />
+                </PageErrorBoundary>
+              } />
+              <Route path="/diagrams" element={
+                <PageErrorBoundary pageName="Diagrams" showBackButton>
+                  <Diagrams />
+                </PageErrorBoundary>
+              } />
+              <Route path="/home-info" element={
+                <PageErrorBoundary pageName="Home Info" showBackButton>
+                  <HomeInfo />
+                </PageErrorBoundary>
+              } />
+              <Route path="/budget" element={
+                <PageErrorBoundary pageName="Budget" showBackButton>
+                  <Budget />
+                </PageErrorBoundary>
+              } />
+              <Route path="/settings" element={
+                <PageErrorBoundary pageName="Settings" showBackButton>
+                  <Settings />
+                </PageErrorBoundary>
+              } />
+              <Route path="/warranties" element={
+                <PageErrorBoundary pageName="Warranties" showBackButton>
+                  <Warranties />
+                </PageErrorBoundary>
+              } />
+              <Route path="/backup" element={
+                <PageErrorBoundary pageName="Backup" showBackButton>
+                  <Backup />
+                </PageErrorBoundary>
+              } />
             </Routes>
           </Layout>
         </ProtectedRoute>

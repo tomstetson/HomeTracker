@@ -49,3 +49,5 @@ temp/
 # Tesseract OCR training data (large binary file)
 eng.traineddata
 *.traineddata
+# Snyk Security Extension - AI Rules (auto-generated)
+.windsurf/rules/snyk_rules.md

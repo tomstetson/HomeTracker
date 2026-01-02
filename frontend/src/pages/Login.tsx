@@ -4,6 +4,36 @@ import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/ui/Button';
 import { Eye, EyeOff, Home, Loader2, Mail } from 'lucide-react';
 
+/**
+ * Validate redirect URL to prevent open redirect attacks
+ * Only allows relative URLs starting with /
+ */
+function getSafeRedirectUrl(url: string | undefined): string {
+  const defaultUrl = '/';
+  if (!url) return defaultUrl;
+  
+  // Only allow relative URLs that start with a single /
+  // Reject protocol-relative URLs (//), absolute URLs, and other schemes
+  if (
+    url.startsWith('/') && 
+    !url.startsWith('//') && 
+    !url.startsWith('/\\') &&
+    !/^\/(\s|%[0-9a-f]{2})*\//i.test(url) // Reject whitespace-padded double slashes
+  ) {
+    // Additional check: ensure no protocol in the path
+    try {
+      const parsed = new URL(url, 'http://localhost');
+      if (parsed.origin === 'http://localhost') {
+        return url;
+      }
+    } catch {
+      // URL parsing failed, reject
+    }
+  }
+  
+  return defaultUrl;
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -15,7 +45,9 @@ export default function Login() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetSent, setResetSent] = useState(false);
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+  // Validate redirect URL to prevent open redirect attacks
+  const rawFrom = (location.state as { from?: { pathname: string } })?.from?.pathname;
+  const from = getSafeRedirectUrl(rawFrom);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

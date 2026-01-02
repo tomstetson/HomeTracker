@@ -2,9 +2,27 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import rateLimit from 'express-rate-limit';
 import { fileService } from '../services/file.service';
 
 const router = Router();
+
+// Rate limiters to prevent resource exhaustion attacks (CWE-770)
+const uploadRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // Limit each IP to 50 uploads per window
+  handler: (_req, res) => {
+    res.status(429).json({ success: false, error: 'Too many uploads, please try again later' });
+  },
+});
+
+const downloadRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Limit each IP to 200 downloads per window
+  handler: (_req, res) => {
+    res.status(429).json({ success: false, error: 'Too many requests, please try again later' });
+  },
+});
 
 // Configure multer for memory storage (we'll handle saving ourselves)
 const upload = multer({
@@ -56,8 +74,8 @@ const upload = multer({
   },
 });
 
-// Upload a file
-router.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
+// Upload a file (rate limited)
+router.post('/upload', uploadRateLimiter, upload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -85,8 +103,8 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
   }
 });
 
-// Upload multiple files
-router.post('/upload-multiple', upload.array('files', 10), async (req: Request, res: Response) => {
+// Upload multiple files (rate limited)
+router.post('/upload-multiple', uploadRateLimiter, upload.array('files', 10), async (req: Request, res: Response) => {
   try {
     const files = req.files as Express.Multer.File[];
     
@@ -198,8 +216,8 @@ router.get('/:id', (req: Request, res: Response) => {
   }
 });
 
-// Download/serve file
-router.get('/:id/download', (req: Request, res: Response) => {
+// Download/serve file (rate limited)
+router.get('/:id/download', downloadRateLimiter, (req: Request, res: Response) => {
   try {
     const file = fileService.getFile(req.params.id);
     
@@ -228,8 +246,8 @@ router.get('/:id/download', (req: Request, res: Response) => {
   }
 });
 
-// Serve file directly (for images)
-router.get('/:id/view', (req: Request, res: Response) => {
+// Serve file directly (for images, rate limited)
+router.get('/:id/view', downloadRateLimiter, (req: Request, res: Response) => {
   try {
     const file = fileService.getFile(req.params.id);
     
@@ -260,8 +278,8 @@ router.get('/:id/view', (req: Request, res: Response) => {
   }
 });
 
-// Serve thumbnail for images
-router.get('/:id/thumbnail', (req: Request, res: Response) => {
+// Serve thumbnail for images (rate limited)
+router.get('/:id/thumbnail', downloadRateLimiter, (req: Request, res: Response) => {
   try {
     const file = fileService.getFile(req.params.id);
     

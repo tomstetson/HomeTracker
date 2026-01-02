@@ -6,6 +6,36 @@
  */
 
 import { Router, Request, Response } from 'express';
+
+// UUID v4 validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Allowed image MIME types to prevent XSS via content-type manipulation
+const ALLOWED_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/bmp',
+  'image/tiff',
+  'image/svg+xml',
+  'image/heic',
+  'image/heif',
+];
+
+/**
+ * Validate that a string is a valid UUID v4 to prevent injection attacks
+ */
+function isValidUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
+/**
+ * Validate MIME type is a safe image type to prevent XSS
+ */
+function isValidImageMimeType(mimeType: string): boolean {
+  return ALLOWED_IMAGE_MIME_TYPES.includes(mimeType.toLowerCase());
+}
 import multer from 'multer';
 import { imageStorageService } from '../services/image-storage.service';
 import { aiBatchProcessorService } from '../services/ai-batch-processor.service';
@@ -122,15 +152,27 @@ router.post('/batch-upload', upload.array('images', 100), async (req: Request, r
  */
 router.get('/:id', (req: Request, res: Response) => {
   try {
+    // Validate ID format to prevent injection
+    if (!isValidUUID(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid image ID format' });
+    }
+    
     const image = imageStorageService.getImage(req.params.id);
     
     if (!image) {
       return res.status(404).json({ success: false, error: 'Image not found' });
     }
 
+    // Validate MIME type to prevent XSS via content-type manipulation
+    if (!isValidImageMimeType(image.mimeType)) {
+      return res.status(400).json({ success: false, error: 'Invalid image type' });
+    }
+
+    // Set security headers
     res.set('Content-Type', image.mimeType);
-    res.set('Content-Disposition', `inline; filename="${image.filename}"`);
-    res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+    res.set('Content-Disposition', `inline; filename="${image.filename.replace(/[^\w.-]/g, '_')}"`);
+    res.set('Cache-Control', 'public, max-age=31536000');
+    res.set('X-Content-Type-Options', 'nosniff'); // Prevent MIME type sniffing
     res.send(image.buffer);
   } catch (error: any) {
     console.error('Get image error:', error);
@@ -144,14 +186,26 @@ router.get('/:id', (req: Request, res: Response) => {
  */
 router.get('/:id/thumbnail', (req: Request, res: Response) => {
   try {
+    // Validate ID format to prevent injection
+    if (!isValidUUID(req.params.id)) {
+      return res.status(400).json({ success: false, error: 'Invalid image ID format' });
+    }
+    
     const thumbnail = imageStorageService.getThumbnail(req.params.id);
     
     if (!thumbnail) {
       return res.status(404).json({ success: false, error: 'Thumbnail not found' });
     }
 
+    // Validate MIME type to prevent XSS via content-type manipulation
+    if (!isValidImageMimeType(thumbnail.mimeType)) {
+      return res.status(400).json({ success: false, error: 'Invalid image type' });
+    }
+
+    // Set security headers
     res.set('Content-Type', thumbnail.mimeType);
     res.set('Cache-Control', 'public, max-age=31536000');
+    res.set('X-Content-Type-Options', 'nosniff'); // Prevent MIME type sniffing
     res.send(thumbnail.buffer);
   } catch (error: any) {
     console.error('Get thumbnail error:', error);
