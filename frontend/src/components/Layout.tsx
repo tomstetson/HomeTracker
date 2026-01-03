@@ -30,6 +30,7 @@ import GlobalSearch from './GlobalSearch';
 import NotificationPanel from './NotificationPanel';
 import { MobileNav } from './MobileNav';
 import { OfflineIndicator } from './OfflineIndicator';
+import { GlobalMaple } from './GlobalMaple';
 
 // Hook to get property info from consolidated storage
 function usePropertyInfo() {
@@ -417,6 +418,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Offline Indicator */}
       <OfflineIndicator />
+
+      {/* Global Maple AI Assistant */}
+      <GlobalMaple />
     </div>
   );
 }
