@@ -46,11 +46,12 @@ import {
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'action';
+  role: 'user' | 'assistant' | 'action' | 'clarification';
   content: string;
   timestamp: Date;
   isError?: boolean;
   actionResult?: ActionResult;
+  clarificationOptions?: string[];
 }
 
 interface QuickAction {
@@ -147,7 +148,7 @@ export function GlobalMaple() {
     try {
       // Build conversation history
       const history: AIMessage[] = messages.slice(-10).map((m) => ({
-        role: m.role === 'action' ? 'assistant' : m.role,
+        role: (m.role === 'action' || m.role === 'clarification') ? 'assistant' : m.role,
         content: m.content,
       }));
 
@@ -185,36 +186,56 @@ export function GlobalMaple() {
         // Execute the action
         const result = await executeAction(action);
 
-        // Add action result message
-        const actionMessage: ChatMessage = {
-          id: `action-${Date.now()}`,
-          role: 'action',
-          content: result.message,
-          timestamp: new Date(),
-          isError: !result.success,
-          actionResult: result,
-        };
-        setMessages((prev) => [...prev, actionMessage]);
+        // Check if this is a clarification request
+        if (action.type === 'ask_clarification' && result.data?.type === 'clarification') {
+          // Clean the response (remove the JSON block) for display
+          const cleanedResponse = response
+            .replace(/```json[\s\S]*?```/g, '')
+            .replace(/\{"action":[^}]+\}\}/g, '')
+            .trim();
 
-        // Clean the response (remove the JSON block) for display
-        const cleanedResponse = response
-          .replace(/```json[\s\S]*?```/g, '')
-          .replace(/\{"action":[^}]+\}\}/g, '')
-          .trim();
-
-        if (cleanedResponse) {
-          const assistantMessage: ChatMessage = {
-            id: `assistant-${Date.now()}`,
-            role: 'assistant',
-            content: cleanedResponse,
+          // Add clarification message with clickable options
+          const clarificationMessage: ChatMessage = {
+            id: `clarification-${Date.now()}`,
+            role: 'clarification',
+            content: cleanedResponse || result.data.question,
             timestamp: new Date(),
+            clarificationOptions: result.data.options,
+            actionResult: result,
           };
-          setMessages((prev) => [...prev, assistantMessage]);
-        }
+          setMessages((prev) => [...prev, clarificationMessage]);
+        } else {
+          // Regular action result
+          const actionMessage: ChatMessage = {
+            id: `action-${Date.now()}`,
+            role: 'action',
+            content: result.message,
+            timestamp: new Date(),
+            isError: !result.success,
+            actionResult: result,
+          };
+          setMessages((prev) => [...prev, actionMessage]);
 
-        // Navigate if action specifies
-        if (result.navigateTo) {
-          setTimeout(() => navigate(result.navigateTo!), 500);
+          // Clean the response (remove the JSON block) for display
+          const cleanedResponse = response
+            .replace(/```json[\s\S]*?```/g, '')
+            .replace(/\{"action":[^}]+\}\}/g, '')
+            .trim();
+
+          if (cleanedResponse) {
+            const assistantMessage: ChatMessage = {
+              id: `assistant-${Date.now()}`,
+              role: 'assistant',
+              content: cleanedResponse,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, assistantMessage]);
+          }
+
+          // Navigate if action specifies
+          if (result.navigateTo) {
+            setTimeout(() => navigate(result.navigateTo!), 500);
+          }
         }
       } else {
         // Regular response without action
@@ -261,10 +282,10 @@ export function GlobalMaple() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-20 right-4 z-50 lg:bottom-4 w-14 h-14 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center text-white hover:scale-105"
+          className="fixed bottom-20 right-4 z-50 lg:bottom-4 w-14 h-14 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center text-white hover:scale-105 overflow-hidden"
           title="Open Maple AI Assistant"
         >
-          <span className="text-2xl">🍁</span>
+          <img src="/images/maple-avatar.png" alt="Maple" className="w-12 h-12 rounded-full object-cover" />
         </button>
       )}
 
@@ -277,7 +298,7 @@ export function GlobalMaple() {
           {/* Header */}
           <div className="flex items-center justify-between p-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🍁</span>
+              <img src="/images/maple-avatar.png" alt="Maple" className="w-8 h-8 rounded-full object-cover border-2 border-white/30" />
               <div>
                 <span className="font-semibold text-sm">Maple</span>
                 <span className="text-xs text-white/80 ml-2">
@@ -308,7 +329,7 @@ export function GlobalMaple() {
             {!aiReady.ready ? (
               // Not configured state
               <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
-                <div className="text-5xl mb-4">🍁</div>
+                <img src="/images/maple-avatar.png" alt="Maple" className="w-16 h-16 rounded-full object-cover mb-4 border-2 border-muted grayscale opacity-60" />
                 <p className="font-medium text-foreground mb-2">Maple Not Configured</p>
                 <p className="text-sm mb-4">{aiReady.error}</p>
                 <Link to="/settings" onClick={() => setIsOpen(false)}>
@@ -325,7 +346,7 @@ export function GlobalMaple() {
                   {messages.length === 0 ? (
                     // Empty state with quick actions
                     <div className="text-center py-6">
-                      <div className="text-5xl mb-3">🍁</div>
+                      <img src="/images/maple-avatar.png" alt="Maple" className="w-16 h-16 rounded-full object-cover mx-auto mb-3 border-2 border-amber-500/30" />
                       <p className="font-medium text-foreground mb-1">Hi! I'm Maple</p>
                       <p className="text-xs text-muted-foreground mb-4">
                         Your AI assistant for managing your home
@@ -352,8 +373,8 @@ export function GlobalMaple() {
                         <div
                           key={message.id}
                           className={cn(
-                            'flex',
-                            message.role === 'user' ? 'justify-end' : 'justify-start'
+                            'flex flex-col',
+                            message.role === 'user' ? 'items-end' : 'items-start'
                           )}
                         >
                           <div
@@ -365,6 +386,8 @@ export function GlobalMaple() {
                                 ? message.isError
                                   ? 'bg-destructive/10 text-destructive border border-destructive/20'
                                   : 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20'
+                                : message.role === 'clarification'
+                                ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'
                                 : message.isError
                                 ? 'bg-destructive/10 text-destructive border border-destructive/20'
                                 : 'bg-muted text-foreground'
@@ -382,8 +405,34 @@ export function GlobalMaple() {
                                 </span>
                               </div>
                             )}
+                            {message.role === 'clarification' && (
+                              <div className="flex items-center gap-2 mb-1">
+                                <Lightbulb className="w-4 h-4" />
+                                <span className="font-medium text-xs uppercase">
+                                  Quick Question
+                                </span>
+                              </div>
+                            )}
                             {renderMessageContent(message.content)}
                           </div>
+
+                          {/* Clickable options for clarification messages */}
+                          {message.role === 'clarification' && message.clarificationOptions && message.clarificationOptions.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2 max-w-[85%]">
+                              {message.clarificationOptions.map((option, index) => (
+                                <Button
+                                  key={index}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleSend(option)}
+                                  disabled={isLoading}
+                                  className="text-xs h-7 px-2.5 border-amber-500/30 hover:bg-amber-500/10 hover:border-amber-500/50"
+                                >
+                                  {option}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                       {isLoading && (
