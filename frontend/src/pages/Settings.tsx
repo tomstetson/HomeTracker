@@ -39,6 +39,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { PowerSettings } from '../components/PowerSettings';
 
 export default function Settings() {
   const toast = useToast();
@@ -952,6 +953,9 @@ export default function Settings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Power Monitoring */}
+      <PowerSettings />
 
       {/* About */}
       <Card className="bg-card/80 backdrop-blur-sm border-border/50">

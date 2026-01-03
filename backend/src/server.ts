@@ -28,6 +28,7 @@ import storageRoutes from './routes/storage.routes';
 import notificationsRoutes from './routes/notifications.routes';
 import suggestionsRoutes from './routes/suggestions.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import powerRoutes from './routes/power.routes';
 
 // Import Excel service for graceful shutdown
 import { excelService } from './services/excel.service';
@@ -138,6 +139,7 @@ app.use('/api/storage', storageRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/suggestions', suggestionsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/power', powerRoutes);
 
 // Settings routes
 app.get('/api/settings', (req: Request, res: Response) => {
