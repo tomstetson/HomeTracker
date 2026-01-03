@@ -9,6 +9,7 @@ import { useMaintenanceStore, MaintenanceTask } from '../store/maintenanceStore'
 import { useInventoryStore, InventoryItem } from '../store/inventoryStore';
 import { useProjectStore, Project } from '../store/projectStore';
 import { useVendorStore, Vendor } from '../store/vendorStore';
+import { buildHomeContext, contextToNaturalLanguage, queryHomeContext } from './homeContext';
 
 // ============================================================================
 // Action Types
@@ -177,17 +178,21 @@ If the user's request is ambiguous, ask follow-up questions to gather the right 
 
 === RESPONSE FORMAT ===
 
-- For QUESTIONS: Respond naturally with helpful information
+- For QUESTIONS about home data: Use the HOME DATA section below to give accurate answers
 - For ACTIONS: Include the JSON block, then explain what you did
 - For CLARIFICATION: Ask your question naturally, include the JSON block
 - Always confirm what you created and offer to navigate there
 
 === CONTEXT ===
 Current page: {currentPage}
-Additional context: {recentContext}
+
+=== HOME DATA (User's Actual Home Information) ===
+{homeData}
 
 === PERSONALITY ===
-Be friendly, thorough, and proactive. Ask smart questions to ensure you capture the right information for future reminders and tracking. Use the 🍁 emoji occasionally.
+Be friendly, thorough, and proactive. When answering questions about the home, use the real data above.
+Ask smart questions to ensure you capture the right information for future reminders and tracking.
+Use the 🍁 emoji occasionally.
 `;
 
 // ============================================================================
@@ -524,12 +529,75 @@ function executeAskClarification(params: Record<string, any>): ActionResult {
 // System Prompt Builder
 // ============================================================================
 
+/**
+ * Build the complete Maple system prompt with real home data
+ * This makes Maple "intelligent" about the user's actual home
+ */
 export function buildMapleSystemPrompt(currentPath: string, additionalContext?: string): string {
   const pageContext = getPageContext(currentPath);
 
+  // Build real home context from stores
+  let homeData: string;
+  try {
+    const context = buildHomeContext();
+    homeData = contextToNaturalLanguage(context);
+  } catch (e) {
+    console.error('Failed to build home context:', e);
+    homeData = 'Home data temporarily unavailable.';
+  }
+
   let prompt = MAPLE_ACTIONS_PROMPT
     .replace('{currentPage}', pageContext)
-    .replace('{recentContext}', additionalContext || 'No additional context');
+    .replace('{homeData}', homeData);
+
+  // Append any additional context if provided
+  if (additionalContext) {
+    prompt += `\n\nAdditional context: ${additionalContext}`;
+  }
 
   return prompt;
+}
+
+/**
+ * Get a summary of specific data based on a query
+ * Can be used for more targeted responses
+ */
+export function getQueryContext(query: string): string {
+  try {
+    const results = queryHomeContext(query);
+    const lines: string[] = [];
+
+    if (results.matchedItems.length > 0) {
+      lines.push(`Found ${results.matchedItems.length} inventory items matching "${query}":`);
+      results.matchedItems.slice(0, 5).forEach(item => {
+        lines.push(`  - ${item.name} (${item.category}) in ${item.location}`);
+      });
+    }
+
+    if (results.matchedTasks.length > 0) {
+      lines.push(`Found ${results.matchedTasks.length} maintenance tasks matching "${query}":`);
+      results.matchedTasks.slice(0, 5).forEach(task => {
+        lines.push(`  - ${task.title} (${task.status}, due ${task.dueDate})`);
+      });
+    }
+
+    if (results.matchedProjects.length > 0) {
+      lines.push(`Found ${results.matchedProjects.length} projects matching "${query}":`);
+      results.matchedProjects.slice(0, 5).forEach(project => {
+        lines.push(`  - ${project.name} (${project.status}, ${project.progress}% complete)`);
+      });
+    }
+
+    if (results.matchedVendors.length > 0) {
+      lines.push(`Found ${results.matchedVendors.length} vendors matching "${query}":`);
+      results.matchedVendors.slice(0, 5).forEach(vendor => {
+        lines.push(`  - ${vendor.businessName} (${vendor.category.join(', ')})`);
+      });
+    }
+
+    return lines.length > 0 ? lines.join('\n') : `No results found for "${query}"`;
+  } catch (e) {
+    console.error('Query failed:', e);
+    return 'Search temporarily unavailable.';
+  }
 }
